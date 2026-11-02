@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order.id }} · {{ APP_NAME }}{% endblock %}
+{% block body_attrs %}data-clear-cart="{{ order.venue_slug }}"{% endblock %}
+{% block content %}
+<div id="live-box" data-live-url="/order/{{ order.id }}/fragment" data-live-ws="/ws/me" data-live-order="{{ order.id }}" data-live-select="#order-box">
+  <div id="order-box">{% include "_order.html" %}</div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/live.js"></script>{% endblock %}

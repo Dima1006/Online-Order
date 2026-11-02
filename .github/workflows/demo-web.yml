@@ -1,0 +1,70 @@
+name: Run web demo
+
+# Manual demo launcher. Starts a public tunnel first (so the site knows its own address),
+# then the site. The URL is printed in the run summary. The database is temporary.
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: web/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r web/requirements.txt
+
+      - name: Open a public tunnel
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          nohup ./cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000 > tunnel.log 2>&1 &
+          URL=""
+          for i in $(seq 1 30); do
+            URL=$(grep -o 'https://[-a-z0-9]*\.trycloudflare\.com' tunnel.log | head -1 || true)
+            [ -n "$URL" ] && break
+            sleep 2
+          done
+          [ -n "$URL" ] || { cat tunnel.log; exit 1; }
+          echo "BASE_URL=$URL" >> "$GITHUB_ENV"
+          {
+            echo "### Demo is live"
+            echo "$URL"
+            echo ""
+            echo "Customers: sign up on the site. Venues: /venue/register, approve them at /admin (ADMIN_PASSWORD secret)."
+            echo "Demo venue login: demo@woodcoffee.pl (password: DEMO_PASSWORD secret, or see the log of the next step)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Start the site
+        working-directory: web
+        env:
+          DEMO_SEED: "1"
+          DEMO_MODE: "1"          # demo only: e-mail confirmation is not required to order
+          TRUST_PROXY: "1"
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SECRET_KEY_FROM_SECRET: ${{ secrets.SECRET_KEY }}
+        run: |
+          export SECRET_KEY="${SECRET_KEY_FROM_SECRET:-$(openssl rand -hex 32)}"
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers > ../server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fs http://127.0.0.1:8000/healthz > /dev/null && break
+            sleep 1
+          done
+          curl -fs http://127.0.0.1:8000/healthz > /dev/null || { cat ../server.log; exit 1; }
+          grep '\[demo\]' ../server.log || true
+
+      - name: Keep running (cancel the run to stop)
+        run: sleep 21000

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}My orders · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>My orders</h1>
+<div data-live-url="/my-orders" data-live-ws="/ws/me" data-live-select="#my-orders-list" id="live-box">
+<div id="my-orders-list">
+{% if orders %}
+<ul class="history big">
+  {% for o in orders %}
+  <li>
+    <a href="/order/{{ o.id }}"><strong>#{{ o.id }} · {{ o.venue_name }}</strong><span class="muted"> {{ o.created_date }} {{ o.created_local }}</span></a>
+    <span class="badge status-{{ o.status }}">{{ o.status_label }}</span>
+    <span>{{ o.total | zl }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}<p class="empty">No orders yet. <a href="/">Find a venue</a>.</p>{% endif %}
+</div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/live.js"></script>{% endblock %}

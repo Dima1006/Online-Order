@@ -1,0 +1,14 @@
+{# Rows of "size name + price". `variants` is empty for a new item. #}
+{% macro size_rows(variants) %}
+<div class="sizes">
+  <div class="size-head"><span>Size name <span class="muted">(skip if only one)</span></span><span>Price, zł</span></div>
+  {% for v in (variants or [none]) %}
+  <div class="size-row">
+    <input name="size_label" value="{{ v.label if v else '' }}" maxlength="40" placeholder="e.g. Small" aria-label="Size name">
+    <input name="size_price" value="{{ ('%d.%02d' % (v.price // 100, v.price % 100)) if v else '' }}" inputmode="decimal" required placeholder="6.50" aria-label="Price in zł">
+    <button type="button" class="remove-size" aria-label="Remove this size" title="Remove this size">×</button>
+  </div>
+  {% endfor %}
+  <button type="button" class="btn ghost add-size">+ Add another size</button>
+</div>
+{% endmacro %}

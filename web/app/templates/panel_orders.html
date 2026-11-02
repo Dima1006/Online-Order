@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Orders · {{ venue.name }}{% endblock %}
+{% block nav %}{% include "_panel_nav.html" %}{% endblock %}
+{% block content %}
+<div class="bar"><h1>Orders</h1><span class="conn" id="conn" data-state="connecting">Connecting…</span></div>
+<form method="get" action="/panel/orders" class="filters" id="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search name, phone, dish or #number" aria-label="Search orders">
+  <select name="status" aria-label="Status">
+    {% for key, label in STATUS_FILTERS.items() %}<option value="{{ key }}" {{ 'selected' if key == status else '' }}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="period" aria-label="Period">
+    {% for key, label in PERIODS.items() %}<option value="{{ key }}" {{ 'selected' if key == period else '' }}>{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn">Search</button>
+  <a class="btn ghost" href="/panel/orders">Reset</a>
+</form>
+<div id="live-box" data-live-url="{{ page_url(page) }}&partial=1" data-live-ws="/ws/panel" data-live-select="#rows-box">
+  <div id="rows-box">{% include "_order_rows.html" %}</div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/live.js"></script>{% endblock %}

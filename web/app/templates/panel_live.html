@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Live orders · {{ venue.name }}{% endblock %}
+{% block nav %}{% include "_panel_nav.html" %}{% endblock %}
+{% block content %}
+<div class="bar">
+  <h1>Live orders</h1>
+  <span class="conn" id="conn" data-state="connecting">Connecting…</span>
+  <button type="button" class="btn ghost" id="sound-toggle">Sound: off</button>
+</div>
+<div id="live-box" data-live-url="/panel/live/fragment" data-live-ws="/ws/panel" data-live-sound="1">
+  <div id="live-content">{% set new_count = active | selectattr("status", "equalto", "new") | list | length %}{% include "_live.html" %}</div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/live.js"></script>{% endblock %}

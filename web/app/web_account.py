@@ -1,0 +1,323 @@
+"""Customer accounts: sign up, log in (password or Google), verify e-mail, reset password, My account, My orders."""
+import hashlib
+import hmac
+import secrets
+
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException
+from starlette.responses import RedirectResponse
+from starlette.websockets import WebSocket
+
+from . import config as cfg
+from . import google, orders, realtime
+from .core import (current_user, go, login_session, read_form, render, require_user, route, ws_user)
+from .mail import public_url, send_mail
+from .security import client_ip, limiter, ws_origin_ok
+from .utils import (clean, dummy_hash, hash_password, password_problem, safe_next, session_fingerprint,
+                    valid_email, verify_password)
+
+TOO_MANY = "Too many attempts. Please wait a few minutes and try again."
+
+
+def _signer(salt: str) -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(cfg.SECRET_KEY, salt=salt)
+
+
+def _throttle(key: str, limit: int, window: float) -> None:
+    if not limiter.allow(key, limit, window):
+        raise HTTPException(429, TOO_MANY)
+
+
+# ---------------------------------------------------------------- sign up / log in
+
+@route
+async def login(request, conn):
+    if request.method == "GET":
+        return render(request, "login.html", next=safe_next(request.query_params.get("next")), email="")
+    form = await read_form(request)
+    email = clean(str(form.get("email", "")), 254).lower()
+    password = str(form.get("password", ""))[:129]
+    nxt = safe_next(str(form.get("next", "")))
+    _throttle(f"login-ip:{client_ip(request)}", 20, 600)
+    _throttle(f"login-email:{email}", 8, 600)
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    stored = user["password_hash"] if user and user["password_hash"] else dummy_hash()
+    ok = await run_in_threadpool(verify_password, password, stored)
+    if not (user and user["password_hash"] and ok):
+        return render(request, "login.html", 400, next=nxt, email=email, error="Wrong email or password.")
+    login_session(request, user=user)
+    return go(request, nxt)
+
+
+async def _send_verification(request, user) -> None:
+    token = _signer("verify-email").dumps({"uid": user["id"], "email": user["email"]})
+    await send_mail(user["email"], "Confirm your email",
+                    f"Hi {user['name']},\n\nConfirm your email address:\n{public_url('/verify/' + token, request)}\n\n"
+                    "The link is valid for 3 days. If you did not sign up, ignore this message.")
+
+
+@route
+async def signup(request, conn):
+    if request.method == "GET":
+        return render(request, "signup.html", form={}, next=safe_next(request.query_params.get("next")))
+    form = await read_form(request)
+    _throttle(f"signup-ip:{client_ip(request)}", 10, 3600)
+    name = clean(str(form.get("name", "")), 60)
+    email = clean(str(form.get("email", "")), 254).lower()
+    phone = clean(str(form.get("phone", "")), 30)
+    password = str(form.get("password", ""))
+    nxt = safe_next(str(form.get("next", "")))
+    error = None
+    if not name:
+        error = "Enter your name."
+    elif not valid_email(email):
+        error = "Enter a valid email address."
+    elif (problem := password_problem(password, email)):
+        error = problem
+    elif conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+        error = "An account with this email already exists. Log in, or use “Forgot password”."
+    if error:
+        return render(request, "signup.html", 400, error=error, next=nxt,
+                      form={"name": name, "email": email, "phone": phone})
+    hashed = await run_in_threadpool(hash_password, password)
+    with conn:
+        uid = conn.execute("INSERT INTO users (email, password_hash, name, phone) VALUES (?, ?, ?, ?)",
+                           (email, hashed, name, phone)).lastrowid
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    await _send_verification(request, user)
+    login_session(request, user=user)
+    msg = ("Account created. Check your inbox and confirm your email to place orders."
+           if not cfg.DEMO_MODE else "Account created.")
+    return go(request, nxt, msg=msg)
+
+
+@route
+async def logout(request, conn):
+    await read_form(request)
+    request.session.clear()
+    return go(request, "/")
+
+
+@route
+async def verify_email(request, conn):
+    try:
+        data = _signer("verify-email").loads(request.path_params["token"], max_age=3 * 86400)
+    except (BadSignature, SignatureExpired):
+        return render(request, "message.html", 400, title="Link expired",
+                      text="This confirmation link is invalid or has expired. Log in and request a new one in My account.")
+    with conn:
+        conn.execute("UPDATE users SET email_verified = 1 WHERE id = ? AND email = ?", (data["uid"], data["email"]))
+    return go(request, "/account" if current_user(request) else "/login", msg="Email confirmed. Thank you!")
+
+
+@route
+async def resend_verification(request, conn):
+    await read_form(request)
+    user = require_user(request)
+    _throttle(f"resend:{user['id']}", 3, 3600)
+    if not user["email_verified"]:
+        await _send_verification(request, user)
+    return go(request, "/account", msg="If your address is not confirmed yet, a new link is on its way.")
+
+
+# ---------------------------------------------------------------- password reset
+
+def _reset_fingerprint(user) -> str:
+    return hashlib.sha256((user["password_hash"] or "").encode()).hexdigest()[:16]
+
+
+@route
+async def forgot(request, conn):
+    if request.method == "GET":
+        return render(request, "forgot.html")
+    form = await read_form(request)
+    email = clean(str(form.get("email", "")), 254).lower()
+    _throttle(f"forgot-ip:{client_ip(request)}", 5, 3600)
+    _throttle(f"forgot-email:{email}", 3, 3600)
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if user:
+        token = _signer("reset-password").dumps({"uid": user["id"], "fp": _reset_fingerprint(user)})
+        await send_mail(email, "Reset your password",
+                        f"Hi {user['name']},\n\nChoose a new password:\n{public_url('/reset/' + token, request)}\n\n"
+                        "The link works once and is valid for 1 hour. If you did not ask for it, ignore this message.")
+    # Same answer whether or not the account exists, so this form cannot be used to find out who has one.
+    return render(request, "message.html", title="Check your inbox",
+                  text="If an account with this email exists, we sent a link to reset the password.")
+
+
+def _user_from_reset_token(conn, token: str):
+    try:
+        data = _signer("reset-password").loads(token, max_age=3600)
+    except (BadSignature, SignatureExpired):
+        return None
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (data.get("uid"),)).fetchone()
+    if user and hmac.compare_digest(_reset_fingerprint(user), str(data.get("fp"))):  # single use
+        return user
+    return None
+
+
+@route
+async def reset_password(request, conn):
+    token = request.path_params["token"]
+    user = _user_from_reset_token(conn, token)
+    if not user:
+        return render(request, "message.html", 400, title="Link expired",
+                      text="This reset link is invalid, already used or expired. Request a new one.")
+    if request.method == "GET":
+        return render(request, "reset.html", token=token)
+    form = await read_form(request)
+    _throttle(f"reset-ip:{client_ip(request)}", 10, 3600)
+    password = str(form.get("password", ""))
+    if (problem := password_problem(password, user["email"])):
+        return render(request, "reset.html", 400, token=token, error=problem)
+    hashed = await run_in_threadpool(hash_password, password)
+    with conn:  # proving control of the mailbox also confirms the address
+        conn.execute("UPDATE users SET password_hash = ?, email_verified = 1 WHERE id = ?", (hashed, user["id"]))
+    return go(request, "/login", msg="Password changed. Log in with the new password.")
+
+
+# ---------------------------------------------------------------- Google
+
+@route
+async def google_start(request, conn):
+    if not google.enabled():
+        raise HTTPException(404, "Google sign-in is not configured.")
+    _throttle(f"google-ip:{client_ip(request)}", 30, 600)
+    state, nonce = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
+    request.session.update(g_state=state, g_nonce=nonce,
+                           g_next=safe_next(request.query_params.get("next")))
+    return RedirectResponse(google.auth_url(public_url("/auth/google/callback", request), state, nonce), status_code=303)
+
+
+@route
+async def google_callback(request, conn):
+    if not google.enabled():
+        raise HTTPException(404, "Google sign-in is not configured.")
+    state, nonce = request.session.pop("g_state", None), request.session.pop("g_nonce", None)
+    nxt = safe_next(request.session.pop("g_next", "/"))
+    sent = request.query_params.get("state", "")
+    code = request.query_params.get("code")
+    if not state or not code or not hmac.compare_digest(sent.encode(), state.encode()):
+        return go(request, "/login", error="Google sign-in failed. Please try again.")
+    try:
+        tokens = await google.exchange_code(code, public_url("/auth/google/callback", request))
+        claims = google.validate_claims(google.claims_from_id_token(tokens["id_token"]), nonce)
+    except Exception:
+        return go(request, "/login", error="Google sign-in failed. Please try again.")
+    email, sub = claims["email"].lower(), claims["sub"]
+    name = clean(claims.get("name") or email.split("@")[0], 60)
+    user = conn.execute("SELECT * FROM users WHERE google_sub = ?", (sub,)).fetchone()
+    with conn:
+        if not user:
+            user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            if user and not user["email_verified"]:
+                # Somebody registered this address with a password but never proved they own it.
+                # Drop that password so it cannot be used to enter the real owner's account.
+                conn.execute("UPDATE users SET password_hash = NULL, google_sub = ?, email_verified = 1 WHERE id = ?",
+                             (sub, user["id"]))
+            elif user:
+                conn.execute("UPDATE users SET google_sub = ?, email_verified = 1 WHERE id = ?", (sub, user["id"]))
+            else:
+                conn.execute("INSERT INTO users (email, google_sub, name, email_verified) VALUES (?, ?, ?, 1)",
+                             (email, sub, name))
+    user = conn.execute("SELECT * FROM users WHERE google_sub = ?", (sub,)).fetchone()
+    login_session(request, user=user)
+    return go(request, nxt)
+
+
+# ---------------------------------------------------------------- My account
+
+@route
+async def account(request, conn):
+    user = require_user(request)
+    return render(request, "account.html", user=user)
+
+
+@route
+async def account_update(request, conn):
+    form = await read_form(request)
+    user = require_user(request)
+    name, phone = clean(str(form.get("name", "")), 60), clean(str(form.get("phone", "")), 30)
+    if not name:
+        return go(request, "/account", error="Name cannot be empty.")
+    with conn:
+        conn.execute("UPDATE users SET name = ?, phone = ? WHERE id = ?", (name, phone, user["id"]))
+    return go(request, "/account", msg="Saved. New orders will use these details.")
+
+
+@route
+async def account_password(request, conn):
+    form = await read_form(request)
+    user = require_user(request)
+    _throttle(f"pw-change:{user['id']}", 5, 3600)
+    new = str(form.get("new_password", ""))
+    if user["password_hash"]:
+        current = str(form.get("current_password", ""))[:129]
+        if not await run_in_threadpool(verify_password, current, user["password_hash"]):
+            return go(request, "/account", error="Current password is wrong.")
+    if (problem := password_problem(new, user["email"])):
+        return go(request, "/account", error=problem)
+    hashed = await run_in_threadpool(hash_password, new)
+    with conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user["id"]))
+    request.session["pv"] = session_fingerprint(hashed)  # this device stays logged in, all others are logged out
+    return go(request, "/account", msg="Password changed. Other devices were logged out.")
+
+
+@route
+async def account_delete(request, conn):
+    form = await read_form(request)
+    user = require_user(request)
+    _throttle(f"acct-delete:{user['id']}", 5, 3600)
+    if user["password_hash"]:
+        ok = await run_in_threadpool(verify_password, str(form.get("password", ""))[:129], user["password_hash"])
+    else:
+        ok = str(form.get("confirm_email", "")).strip().lower() == user["email"]
+    if not ok:
+        return go(request, "/account", error="Confirmation did not match. Your account was not deleted.")
+    with conn:
+        # Venues keep their order history for bookkeeping, but without personal data.
+        conn.execute("UPDATE orders SET customer_name = 'Deleted customer', phone = '', note = '' WHERE user_id = ?",
+                     (user["id"],))
+        conn.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+    request.session.clear()
+    return go(request, "/", msg="Your account and personal data were deleted.")
+
+
+# ---------------------------------------------------------------- my orders
+
+@route
+async def my_orders(request, conn):
+    user = require_user(request)
+    return render(request, "my_orders.html", orders=orders.user_orders(conn, user["id"]))
+
+
+def _own_order(conn, user, order_id: int):
+    row = conn.execute(
+        "SELECT o.*, v.name AS venue_name, v.address AS venue_address, v.slug AS venue_slug FROM orders o "
+        "JOIN venues v ON v.id = o.venue_id WHERE o.id = ? AND o.user_id = ?", (order_id, user["id"])).fetchone()
+    if not row:
+        raise HTTPException(404, "Order not found")  # also hides other people's order numbers
+    return orders.hydrate(conn, [row])[0]
+
+
+@route
+async def order_page(request, conn):
+    user = require_user(request)
+    return render(request, "order.html", order=_own_order(conn, user, request.path_params["order_id"]))
+
+
+@route
+async def order_fragment(request, conn):
+    user = require_user(request)
+    return render(request, "_order.html", fragment=True,
+                  order=_own_order(conn, user, request.path_params["order_id"]))
+
+
+async def ws_me(ws: WebSocket):
+    """Pushes 'your order changed' events to a logged-in customer."""
+    user = ws_user(ws) if ws_origin_ok(ws) else None
+    if not user:
+        return await ws.close(code=1008)
+    await realtime.serve(ws, [f"user:{user['id']}"])

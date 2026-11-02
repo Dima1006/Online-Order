@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ venue.name }}{% endblock %}
+{% block nav %}{% include "_panel_nav.html" %}{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+{% if venue.status == "pending" %}<div class="notice">Your venue is waiting for approval. Until then it is not listed and cannot take orders. You can already prepare the menu.</div>
+{% elif venue.status != "approved" %}<div class="notice error">Your venue is {{ venue.status }}. Contact us if you think this is a mistake.</div>{% endif %}
+<form method="post" action="/panel/settings/save" class="stack narrow">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Venue name <input name="name" value="{{ venue.name }}" required maxlength="80"></label>
+  <label>City <input name="city" value="{{ venue.city }}" maxlength="60"></label>
+  <label>Street address <input name="address" value="{{ venue.address }}" maxlength="120"></label>
+  <label>Short description <textarea name="description" rows="3" maxlength="300">{{ venue.description }}</textarea></label>
+  <label class="check"><input type="checkbox" name="accepting_orders" {{ 'checked' if venue.accepting_orders else '' }}> Accepting orders</label>
+  <button class="btn">Save</button>
+</form>
+<p class="muted">Your public page: <a href="/v/{{ venue.slug }}">/v/{{ venue.slug }}</a>. It is listed once it is approved and has at least one available item.</p>
+
+<h2 class="gap">Telegram</h2>
+{% if not tg_enabled %}
+<p class="muted">Telegram notifications are not enabled on this server.</p>
+{% else %}
+<p>Get every new order in Telegram and manage it with buttons. The website keeps working at the same time, and both stay in sync.</p>
+{% if chats %}
+<ul class="history">
+  {% for c in chats %}
+  <li><span>{{ c.title or "Chat" }}</span><span class="muted">connected {{ c.created_at[:10] }}</span>
+    <form method="post" action="/panel/telegram/{{ c.id }}/disconnect" class="inline">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="linklike danger-text">Disconnect</button></form></li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% if tg_link %}
+<p>Open this link in Telegram (works once, for 15 minutes). To connect a group chat, add the bot to the group first, then press Start there.</p>
+<p><a class="btn" href="{{ tg_link }}" target="_blank" rel="noopener">Open Telegram</a></p>
+<p class="muted small">{{ tg_link }}</p>
+{% elif not tg_ready %}
+<p class="muted">The bot is still starting. Reload in a few seconds.</p>
+{% endif %}
+<form method="post" action="/panel/telegram/link">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">{{ "Create a new link" if tg_link else "Connect Telegram" }}</button></form>
+{% endif %}
+{% endblock %}

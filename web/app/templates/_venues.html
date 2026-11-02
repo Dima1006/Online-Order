@@ -1,0 +1,16 @@
+{% if venues %}
+<ul class="venue-list">
+  {% for v in venues %}
+  <li>
+    <a href="/v/{{ v.slug }}">
+      <span class="vname">{{ v.name }}</span>
+      <span class="vmeta">{{ [v.address, v.city] | select | join(", ") or "Address not set" }}</span>
+      {% if v.matched %}<span class="vmatch">{{ v.matched | join(", ") }}</span>{% endif %}
+      <span class="vstate {{ 'open' if v.accepting_orders else 'closed' }}">{{ "Taking orders" if v.accepting_orders else "Closed for orders" }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">{% if q %}Nothing found for “{{ q }}”. Try a venue name, a street, or a drink like “latte”.{% else %}No venues yet. Be the first: <a href="/register">register your venue</a>.{% endif %}</p>
+{% endif %}

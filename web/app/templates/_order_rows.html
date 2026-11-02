@@ -1,0 +1,39 @@
+<div data-new="0" hidden></div>
+<p class="muted">{{ total }} order{{ "" if total == 1 else "s" }} found</p>
+{% if orders %}
+<ul class="rows">
+  {% for o in orders %}
+  <li>
+    <details>
+      <summary>
+        <span class="rid">#{{ o.id }}</span>
+        <span class="rname">{{ o.customer_name }}</span>
+        <span class="muted rdate">{{ o.created_date }} {{ o.created_local }}</span>
+        <span class="badge status-{{ o.status }}">{{ o.status_label }}</span>
+        <strong class="rtotal">{{ o.total | zl }}</strong>
+      </summary>
+      <div class="rbody">
+        <ul class="lines">
+          {% for it in o["items"] %}
+          <li><span>{{ it.qty }} × {{ it.name }}{% if it.variant_label %} ({{ it.variant_label }}){% endif %}</span><span>{{ (it.price * it.qty) | zl }}</span></li>
+          {% endfor %}
+        </ul>
+        <p class="muted">Arrival: {{ o.arrival_local }} (+{{ o.arrival_minutes }} min){% if o.phone %} · Phone: {{ o.phone }}{% endif %}</p>
+        {% if o.note %}<p class="note">Note: {{ o.note }}</p>{% endif %}
+        {% if o.decline_reason %}<p class="note">Declined: {{ o.decline_reason }}</p>{% endif %}
+        {% include "_order_actions.html" %}
+      </div>
+    </details>
+  </li>
+  {% endfor %}
+</ul>
+{% if pages > 1 %}
+<nav class="pager" aria-label="Pages">
+  {% if page > 1 %}<a class="btn ghost" href="{{ page_url(page - 1) }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn ghost" href="{{ page_url(page + 1) }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="empty">No orders match these filters.</p>
+{% endif %}

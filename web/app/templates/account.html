@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My account · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>My account</h1>
+{% if user.is_blocked %}<div class="notice error">Your account is blocked after repeated no-shows. Please contact the venue.</div>
+{% elif user.warning_count %}<div class="notice">You have {{ user.warning_count }} no-show warning. After {{ 2 }} you cannot place orders.</div>{% endif %}
+
+<div class="two-col">
+<section>
+  <h2>Your details</h2>
+  <form method="post" action="/account/update" class="stack">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Name <input name="name" value="{{ user.name }}" required maxlength="60"></label>
+    <label>Phone <span class="muted">(optional)</span> <input type="tel" name="phone" value="{{ user.phone }}" maxlength="30"></label>
+    <label>Email <input value="{{ user.email }}" disabled></label>
+    <p class="muted small">{% if user.email_verified %}Email confirmed.{% else %}Email not confirmed yet. You need to confirm it to place orders.{% endif %}</p>
+    <button class="btn">Save</button>
+  </form>
+  {% if not user.email_verified %}
+  <form method="post" action="/resend-verification" class="stack">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">Resend confirmation email</button></form>
+  {% endif %}
+</section>
+
+<section>
+  <h2>{{ "Change password" if user.password_hash else "Set a password" }}</h2>
+  <form method="post" action="/account/password" class="stack">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if user.password_hash %}<label>Current password <input type="password" name="current_password" required autocomplete="current-password"></label>{% endif %}
+    <label>New password <span class="muted">(10+ characters)</span> <input type="password" name="new_password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
+    <button class="btn">Save password</button>
+  </form>
+
+  <h2 class="gap">Delete account</h2>
+  <p class="muted small">Removes your account and personal data. Venues keep anonymous order totals.</p>
+  <form method="post" action="/account/delete" class="stack" data-confirm="Delete your account permanently?">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if user.password_hash %}<label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+    {% else %}<label>Type your email to confirm <input name="confirm_email" required></label>{% endif %}
+    <button class="btn ghost danger-text">Delete my account</button>
+  </form>
+</section>
+</div>
+<p><a href="/my-orders">See my orders</a></p>
+{% endblock %}

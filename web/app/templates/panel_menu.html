@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_macros.html" import size_rows %}
+{% block title %}Menu · {{ venue.name }}{% endblock %}
+{% block nav %}{% include "_panel_nav.html" %}{% endblock %}
+{% block content %}
+<h1>Menu</h1>
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+
+{% if not menu %}
+<section class="starter">
+  <h2>Let's build your menu</h2>
+  <p>The menu has two levels: <strong>categories</strong> (Coffee, Tea, Desserts) and <strong>items</strong> inside them (Latte, Croissant). An item can have several sizes with different prices.</p>
+  <form method="post" action="/panel/menu/starter">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Create Coffee, Tea and Desserts</button></form>
+  <p class="muted">Or create your own category:</p>
+</section>
+{% endif %}
+
+<form method="post" action="/panel/menu/category" class="row-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+  <input name="name" placeholder="New category, e.g. Breakfast" required maxlength="60" aria-label="Category name">
+  <button class="btn {{ 'ghost' if menu else '' }}">Add category</button>
+</form>
+
+{% for cat in menu %}
+<section class="mcat" id="cat-{{ cat.id }}">
+  <div class="mcat-head">
+    <h2>{{ cat.name }}</h2>
+    <form method="post" action="/panel/menu/category/{{ cat.id }}/delete" data-confirm="Delete this category and all its items?">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="linklike danger-text">Delete category</button>
+    </form>
+  </div>
+
+  <ul class="mitems">
+    {% for item in cat["items"] %}
+    <li class="{{ '' if item.is_available else 'soldout' }}">
+      <details>
+        <summary>
+          <span class="mname">{{ item.name }}</span>
+          <span class="muted mprices">{% for v in item.variants %}{{ v.label ~ ' ' if v.label }}{{ v.price | zl }}{{ ' · ' if not loop.last }}{% endfor %}</span>
+          {% if not item.is_available %}<span class="badge">Sold out</span>{% endif %}
+          <span class="edit-hint">Edit</span>
+        </summary>
+        <div class="editor">
+          <form method="post" action="/panel/menu/item/{{ item.id }}" class="stack">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>Name <input name="name" value="{{ item.name }}" required maxlength="80"></label>
+            <label>Description <span class="muted">(optional)</span> <input name="description" value="{{ item.description }}" maxlength="200"></label>
+            {{ size_rows(item.variants) }}
+            <button class="btn">Save changes</button>
+          </form>
+          <div class="actions">
+            <form method="post" action="/panel/menu/item/{{ item.id }}/toggle" class="inline">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">{{ 'Mark sold out' if item.is_available else 'Back in stock' }}</button></form>
+            <form method="post" action="/panel/menu/item/{{ item.id }}/delete" class="inline" data-confirm="Delete this item?">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost danger-text">Delete item</button></form>
+          </div>
+        </div>
+      </details>
+    </li>
+    {% else %}
+    <li class="muted empty-cat">No items yet.</li>
+    {% endfor %}
+  </ul>
+
+  <details class="add-item">
+    <summary class="btn">+ Add item to {{ cat.name }}</summary>
+    <form method="post" action="/panel/menu/item" class="stack editor">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="category_id" value="{{ cat.id }}">
+      <label>Name <input name="name" required maxlength="80" placeholder="e.g. Latte"></label>
+      <label>Description <span class="muted">(optional)</span> <input name="description" maxlength="200"></label>
+      {{ size_rows([]) }}
+      <button class="btn">Add item</button>
+    </form>
+  </details>
+</section>
+{% endfor %}
+{% endblock %}
+{% block scripts %}<script src="/static/menu_editor.js"></script>{% endblock %}

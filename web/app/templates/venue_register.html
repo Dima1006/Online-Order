@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Register your venue · {{ APP_NAME }}{% endblock %}
+{% block nav %}<a href="/venue/login">Venue login</a><a href="/login">Customer login</a>{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Register your venue</h1>
+  <p class="muted">We check every new venue before it appears in search. You can build your menu while you wait.</p>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/venue/register">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Venue name <input name="venue_name" value="{{ form.venue_name or '' }}" required maxlength="80"></label>
+    <label>City <input name="city" value="{{ form.city or '' }}" maxlength="60"></label>
+    <label>Email <input type="email" name="email" value="{{ form.email or '' }}" required autocomplete="email"></label>
+    <label>Password <span class="muted">(10+ characters)</span> <input type="password" name="password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
+    <button class="btn wide">Create venue account</button>
+  </form>
+</section>
+{% endblock %}

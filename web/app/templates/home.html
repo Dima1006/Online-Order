@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Order ahead.<br>Walk in, pick up.</h1>
+  <form method="get" action="/" class="search" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Venue, street or drink: “latte”" aria-label="Search venues" autocomplete="off" autofocus>
+    <button class="btn">Search</button>
+  </form>
+</section>
+<div id="results" aria-live="polite">{% include "_venues.html" %}</div>
+{% endblock %}
+{% block scripts %}<script src="/static/search.js"></script>{% endblock %}

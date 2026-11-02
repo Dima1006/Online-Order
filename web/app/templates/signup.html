@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign up · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Create an account</h1>
+  <p class="muted">Your name and phone are filled in automatically every time you order.</p>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  {% if google_enabled %}
+  <a class="btn ghost wide" href="/auth/google?next={{ next | urlencode }}">Sign up with Google</a>
+  <p class="muted center">or with email</p>
+  {% endif %}
+  <form method="post" action="/signup">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Name <input name="name" value="{{ form.name or '' }}" required maxlength="60" autocomplete="name"></label>
+    <label>Email <input type="email" name="email" value="{{ form.email or '' }}" required autocomplete="email"></label>
+    <label>Phone <span class="muted">(optional, so the venue can reach you)</span> <input type="tel" name="phone" value="{{ form.phone or '' }}" maxlength="30" autocomplete="tel"></label>
+    <label>Password <span class="muted">(10+ characters)</span> <input type="password" name="password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
+    <button class="btn wide">Create account</button>
+  </form>
+  <p class="muted">Already have one? <a href="/login?next={{ next | urlencode }}">Log in</a>.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+<div data-new="{{ new_count }}" hidden></div>
+{% if venue.status != "approved" %}<div class="notice">Your venue is <strong>{{ venue.status }}</strong>: it is not public and cannot receive orders yet.</div>
+{% elif not venue.accepting_orders %}<div class="notice">Your venue is currently <strong>closed for orders</strong>. Change it in Settings.</div>{% endif %}
+{% if active %}
+<ul class="orders">
+  {% for o in active %}
+  <li class="order status-{{ o.status }}">
+    <div class="ohead">
+      <h2>#{{ o.id }} {{ o.customer_name }}</h2>
+      <p class="arrive">Arrives <strong>{{ o.arrival_local }}</strong> <span class="muted">(ordered {{ o.created_local }}, +{{ o.arrival_minutes }} min)</span></p>
+      <span class="badge">{{ o.status_label }}</span>
+    </div>
+    <ul class="lines">
+      {% for it in o["items"] %}
+      <li><span>{{ it.qty }} × {{ it.name }}{% if it.variant_label %} ({{ it.variant_label }}){% endif %}</span><span>{{ (it.price * it.qty) | zl }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="cart-total"><span>Total, pay at the venue</span><strong>{{ o.total | zl }}</strong></p>
+    {% if o.note %}<p class="note">Note: {{ o.note }}</p>{% endif %}
+    {% if o.phone %}<p class="muted">Phone: {{ o.phone }}</p>{% endif %}
+    {% include "_order_actions.html" %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">No active orders. New orders appear here the moment they are placed.</p>
+{% endif %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>Venues</h1>
+{% set pending = venues | selectattr("status", "equalto", "pending") | list %}
+<p class="muted">{{ pending | length }} waiting for approval, {{ venues | length }} in total.</p>
+<ul class="rows admin-rows">
+  {% for v in venues %}
+  <li>
+    <div class="arow">
+      <div>
+        <strong>{{ v.name }}</strong> <span class="badge status-{{ v.status }}">{{ v.status }}</span><br>
+        <span class="muted">{{ v.city or "no city" }} · {{ v.email }} · {{ v.item_count }} items · {{ v.order_count }} orders · {{ v.created_at[:10] }}</span>
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="/v/{{ v.slug }}" target="_blank" rel="noopener">Preview</a>
+        {% if v.status in ("pending", "suspended", "rejected") %}
+        <form method="post" action="/admin/venues/{{ v.id }}/approve" class="inline">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Approve</button></form>
+        {% endif %}
+        {% if v.status == "pending" %}
+        <form method="post" action="/admin/venues/{{ v.id }}/reject" class="inline" data-confirm="Reject this venue?">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost danger-text">Reject</button></form>
+        {% elif v.status == "approved" %}
+        <form method="post" action="/admin/venues/{{ v.id }}/suspend" class="inline" data-confirm="Hide this venue from the site?">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost danger-text">Suspend</button></form>
+        {% endif %}
+      </div>
+    </div>
+  </li>
+  {% else %}<li class="muted">No venues yet.</li>{% endfor %}
+</ul>
+
+<h2 class="gap">Customers with no-shows</h2>
+{% if blocked %}
+<ul class="history">
+  {% for u in blocked %}
+  <li><span>{{ u.name }} <span class="muted">{{ u.email }}</span></span>
+    <span class="badge">{{ "blocked" if u.is_blocked else u.warning_count ~ " warning" }}</span>
+    <form method="post" action="/admin/users/{{ u.id }}/unblock" class="inline">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">Reset</button></form></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">None.</p>{% endif %}
+{% endblock %}
