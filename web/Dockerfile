@@ -8,4 +8,4 @@ ENV DATABASE_PATH=/data/app.db
 VOLUME /data
 EXPOSE 8000
 # ONE worker on purpose: live updates and rate limits live in memory.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--ws-max-size", "1024"]

@@ -4,18 +4,21 @@ import hmac
 import secrets
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 from starlette.responses import RedirectResponse
 from starlette.websockets import WebSocket
 
 from . import config as cfg
 from . import google, orders, realtime
-from .core import (current_user, go, login_session, read_form, render, require_user, route, ws_user)
-from .mail import public_url, send_mail
+from .core import (current_user, go, hash_async, login_session, read_form, render, require_user, route,
+                   verify_async, ws_user)
+from .events import announce
+from .mail import public_url, send_mail_bg
 from .security import client_ip, limiter, ws_origin_ok
-from .utils import (clean, dummy_hash, hash_password, password_problem, safe_next, session_fingerprint,
-                    valid_email, verify_password)
+from .utils import (clean, dummy_hash, name_problem, normalize_phone, password_problem, safe_next,
+                    session_fingerprint, valid_email)
+
+PHONE_HELP = "Enter a valid phone number, for example 600 123 456 or +48 600 123 456."
 
 TOO_MANY = "Too many attempts. Please wait a few minutes and try again."
 
@@ -39,22 +42,26 @@ async def login(request, conn):
     email = clean(str(form.get("email", "")), 254).lower()
     password = str(form.get("password", ""))[:129]
     nxt = safe_next(str(form.get("next", "")))
-    _throttle(f"login-ip:{client_ip(request)}", 20, 600)
-    _throttle(f"login-email:{email}", 8, 600)
+    ip = client_ip(request)
+    # Per IP+account, so a stranger cannot lock somebody out by typing wrong passwords from elsewhere;
+    # the looser per-account and per-IP caps still slow down distributed guessing.
+    _throttle(f"login-ip:{ip}", 20, 600)
+    _throttle(f"login-pair:{ip}:{email}", 8, 600)
+    _throttle(f"login-email:{email}", 40, 3600)
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     stored = user["password_hash"] if user and user["password_hash"] else dummy_hash()
-    ok = await run_in_threadpool(verify_password, password, stored)
+    ok = await verify_async(password, stored)
     if not (user and user["password_hash"] and ok):
         return render(request, "login.html", 400, next=nxt, email=email, error="Wrong email or password.")
     login_session(request, user=user)
     return go(request, nxt)
 
 
-async def _send_verification(request, user) -> None:
+def _send_verification(request, user) -> None:
     token = _signer("verify-email").dumps({"uid": user["id"], "email": user["email"]})
-    await send_mail(user["email"], "Confirm your email",
-                    f"Hi {user['name']},\n\nConfirm your email address:\n{public_url('/verify/' + token, request)}\n\n"
-                    "The link is valid for 3 days. If you did not sign up, ignore this message.")
+    send_mail_bg(user["email"], "Confirm your email",
+                 f"Hi {user['name']},\n\nConfirm your email address:\n{public_url('/verify/' + token, request)}\n\n"
+                 "The link is valid for 3 days. If you did not sign up, ignore this message.")
 
 
 @route
@@ -63,14 +70,19 @@ async def signup(request, conn):
         return render(request, "signup.html", form={}, next=safe_next(request.query_params.get("next")))
     form = await read_form(request)
     _throttle(f"signup-ip:{client_ip(request)}", 10, 3600)
+    if form.get("website"):  # honeypot: invisible to people, bots fill it in
+        raise HTTPException(400, "Something went wrong. Please try again.")
     name = clean(str(form.get("name", "")), 60)
     email = clean(str(form.get("email", "")), 254).lower()
-    phone = clean(str(form.get("phone", "")), 30)
+    raw_phone = clean(str(form.get("phone", "")), 40)
+    phone = normalize_phone(raw_phone)
     password = str(form.get("password", ""))
     nxt = safe_next(str(form.get("next", "")))
     error = None
-    if not name:
-        error = "Enter your name."
+    if (problem := name_problem(name)):
+        error = problem
+    elif phone is None:
+        error = PHONE_HELP
     elif not valid_email(email):
         error = "Enter a valid email address."
     elif (problem := password_problem(password, email)):
@@ -79,13 +91,13 @@ async def signup(request, conn):
         error = "An account with this email already exists. Log in, or use “Forgot password”."
     if error:
         return render(request, "signup.html", 400, error=error, next=nxt,
-                      form={"name": name, "email": email, "phone": phone})
-    hashed = await run_in_threadpool(hash_password, password)
+                      form={"name": name, "email": email, "phone": raw_phone})
+    hashed = await hash_async(password)
     with conn:
         uid = conn.execute("INSERT INTO users (email, password_hash, name, phone) VALUES (?, ?, ?, ?)",
                            (email, hashed, name, phone)).lastrowid
     user = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    await _send_verification(request, user)
+    _send_verification(request, user)
     login_session(request, user=user)
     msg = ("Account created. Check your inbox and confirm your email to place orders."
            if not cfg.DEMO_MODE else "Account created.")
@@ -117,7 +129,7 @@ async def resend_verification(request, conn):
     user = require_user(request)
     _throttle(f"resend:{user['id']}", 3, 3600)
     if not user["email_verified"]:
-        await _send_verification(request, user)
+        _send_verification(request, user)
     return go(request, "/account", msg="If your address is not confirmed yet, a new link is on its way.")
 
 
@@ -138,9 +150,9 @@ async def forgot(request, conn):
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if user:
         token = _signer("reset-password").dumps({"uid": user["id"], "fp": _reset_fingerprint(user)})
-        await send_mail(email, "Reset your password",
-                        f"Hi {user['name']},\n\nChoose a new password:\n{public_url('/reset/' + token, request)}\n\n"
-                        "The link works once and is valid for 1 hour. If you did not ask for it, ignore this message.")
+        send_mail_bg(email, "Reset your password",
+                     f"Hi {user['name']},\n\nChoose a new password:\n{public_url('/reset/' + token, request)}\n\n"
+                     "The link works once and is valid for 1 hour. If you did not ask for it, ignore this message.")
     # Same answer whether or not the account exists, so this form cannot be used to find out who has one.
     return render(request, "message.html", title="Check your inbox",
                   text="If an account with this email exists, we sent a link to reset the password.")
@@ -171,7 +183,7 @@ async def reset_password(request, conn):
     password = str(form.get("password", ""))
     if (problem := password_problem(password, user["email"])):
         return render(request, "reset.html", 400, token=token, error=problem)
-    hashed = await run_in_threadpool(hash_password, password)
+    hashed = await hash_async(password)
     with conn:  # proving control of the mailbox also confirms the address
         conn.execute("UPDATE users SET password_hash = ?, email_verified = 1 WHERE id = ?", (hashed, user["id"]))
     return go(request, "/login", msg="Password changed. Log in with the new password.")
@@ -231,16 +243,21 @@ async def google_callback(request, conn):
 @route
 async def account(request, conn):
     user = require_user(request)
-    return render(request, "account.html", user=user)
+    flags = conn.execute(
+        "SELECT f.warnings, f.blocked, v.name AS venue_name FROM venue_customer_flags f "
+        "JOIN venues v ON v.id = f.venue_id WHERE f.user_id = ? AND f.warnings > 0 ORDER BY v.name", (user["id"],)).fetchall()
+    return render(request, "account.html", user=user, flags=flags, max_no_shows=cfg.MAX_NO_SHOWS)
 
 
 @route
 async def account_update(request, conn):
     form = await read_form(request)
     user = require_user(request)
-    name, phone = clean(str(form.get("name", "")), 60), clean(str(form.get("phone", "")), 30)
-    if not name:
-        return go(request, "/account", error="Name cannot be empty.")
+    name, phone = clean(str(form.get("name", "")), 60), normalize_phone(clean(str(form.get("phone", "")), 40))
+    if (problem := name_problem(name)):
+        return go(request, "/account", error=problem)
+    if phone is None:
+        return go(request, "/account", error=PHONE_HELP)
     with conn:
         conn.execute("UPDATE users SET name = ?, phone = ? WHERE id = ?", (name, phone, user["id"]))
     return go(request, "/account", msg="Saved. New orders will use these details.")
@@ -254,11 +271,11 @@ async def account_password(request, conn):
     new = str(form.get("new_password", ""))
     if user["password_hash"]:
         current = str(form.get("current_password", ""))[:129]
-        if not await run_in_threadpool(verify_password, current, user["password_hash"]):
+        if not await verify_async(current, user["password_hash"]):
             return go(request, "/account", error="Current password is wrong.")
     if (problem := password_problem(new, user["email"])):
         return go(request, "/account", error=problem)
-    hashed = await run_in_threadpool(hash_password, new)
+    hashed = await hash_async(new)
     with conn:
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user["id"]))
     request.session["pv"] = session_fingerprint(hashed)  # this device stays logged in, all others are logged out
@@ -270,8 +287,11 @@ async def account_delete(request, conn):
     form = await read_form(request)
     user = require_user(request)
     _throttle(f"acct-delete:{user['id']}", 5, 3600)
+    if orders.active_order_of(conn, user["id"]):
+        return go(request, "/account", error="You have an active order. Wait until it is finished, or cancel it, "
+                                              "before deleting your account.")
     if user["password_hash"]:
-        ok = await run_in_threadpool(verify_password, str(form.get("password", ""))[:129], user["password_hash"])
+        ok = await verify_async(str(form.get("password", ""))[:129], user["password_hash"])
     else:
         ok = str(form.get("confirm_email", "")).strip().lower() == user["email"]
     if not ok:
@@ -315,9 +335,21 @@ async def order_fragment(request, conn):
                   order=_own_order(conn, user, request.path_params["order_id"]))
 
 
+@route
+async def order_cancel(request, conn):
+    await read_form(request)
+    user = require_user(request)
+    order_id = request.path_params["order_id"]
+    _own_order(conn, user, order_id)  # 404 for somebody else's order
+    if orders.cancel_by_customer(conn, user["id"], order_id):
+        await announce(order_id)
+        return go(request, f"/order/{order_id}", msg="Order cancelled.")
+    return go(request, f"/order/{order_id}", error="The venue already started on this order, so it can no longer be cancelled.")
+
+
 async def ws_me(ws: WebSocket):
     """Pushes 'your order changed' events to a logged-in customer."""
     user = ws_user(ws) if ws_origin_ok(ws) else None
     if not user:
         return await ws.close(code=1008)
-    await realtime.serve(ws, [f"user:{user['id']}"])
+    await realtime.serve(ws, [f"user:{user['id']}"], client_ip(ws))

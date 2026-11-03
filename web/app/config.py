@@ -41,5 +41,26 @@ SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = ""  # filled in at startup from getMe
 
-MAX_NO_SHOWS = 2            # a customer is blocked after this many no-shows
-MAX_BODY_BYTES = 100_000    # requests larger than this are rejected
+# Print the body of e-mails (password-reset links!) to the log when SMTP is not set up. Local development only.
+MAIL_LOG_BODY = env_bool("MAIL_LOG_BODY")
+
+# ---- ordering rules
+MAX_NO_SHOWS = 2                 # a customer is blocked at a venue after this many no-shows there
+NO_SHOW_GRACE_MIN = 15           # "no-show" can be set only this long after the promised arrival time
+EXPIRE_AFTER_MIN = 120           # unhandled orders are closed automatically this long after the arrival time
+MAX_ACTIVE_PER_USER = 4          # active orders one customer may have at the same time
+MAX_ACTIVE_PER_USER_VENUE = 2    # ... and at one venue
+MAX_ORDER_TOTAL = 100_000        # grosze = 1000 zł per order
+MAX_CART_LINES = 30
+MAX_CATEGORIES = 30              # per venue
+MAX_ITEMS = 300                  # per venue
+VENUE_ORDERS_PER_HOUR = 120      # stops a flood of fake orders at one venue
+
+# ---- load protection
+MAX_BODY_BYTES = 100_000         # requests larger than this are rejected (counted while reading)
+RATE_ALL = (240, 60)             # requests per IP per 60 s, all pages
+RATE_POST = (60, 60)             # form submissions per IP per 60 s
+RATE_SEARCH = (40, 60)           # live-search requests per IP per 60 s
+HASH_CONCURRENCY = 4             # password hashes computed at the same time (each uses ~16 MB)
+QUERY_TIMEOUT_S = 3              # a single database query running longer than this is aborted
+WS_MAX_PER_IP = 10               # open WebSockets per IP

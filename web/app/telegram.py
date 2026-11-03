@@ -60,7 +60,7 @@ def order_text(o: dict, venue_name: str) -> str:
     lines.append(f"\n<b>Total {format_zl(o['total'])}</b>, pay at the venue")
     if o["note"]:
         lines.append(f"📝 {e(o['note'])}")
-    status = f"\nStatus: <b>{e(o['status_label'])}</b>"
+    status = f"\nStatus: <b>{e(o['status_label'])}</b>" + (" ⚠️ arrival time has passed" if o.get("overdue") else "")
     if o["status"] == "declined":
         status += f" ({e(o['decline_reason'])})"
     return "\n".join(lines) + status
@@ -70,6 +70,8 @@ def order_keyboard(o: dict) -> dict:
     nexts = orders.ALLOWED.get(o["status"], ())
     rows = []
     main = [n for n in nexts if n not in ("no_show", "declined")]
+    # The no-show button is always shown (a Telegram message cannot update itself when the clock passes);
+    # pressing it too early is refused with an explanation.
     if main:
         rows.append([{"text": "✅ " + orders.ACTION_LABELS[n], "callback_data": f"o:{o['id']}:{n}"} for n in main])
     rest = []
@@ -187,10 +189,11 @@ async def _on_message(msg: dict) -> None:
             o = conn.execute("SELECT venue_id FROM orders WHERE id = ?", (order_id,)).fetchone()
             if not o or o["venue_id"] not in _linked_venue_ids(conn, chat_id):
                 return
-            if orders.transition(conn, o["venue_id"], order_id, "declined", clean(text, 200)):
+            row, error = orders.transition(conn, o["venue_id"], order_id, "declined", clean(text, 200))
+            if row:
                 await events.announce(order_id)
                 return await _reply(chat_id, f"Order #{order_id} declined. The customer can see your reason.")
-            return await _reply(chat_id, "This order was already updated.")
+            return await _reply(chat_id, error)
         await _reply(chat_id, HELP)
     finally:
         conn.close()
@@ -210,14 +213,17 @@ async def _on_callback(cb: dict) -> None:
         if not o or o["venue_id"] not in _linked_venue_ids(conn, chat_id):
             return await _answer(cb_id, "Not allowed", alert=True)
         if action == "decline":
+            if conn.execute("SELECT status FROM orders WHERE id = ?", (order_id,)).fetchone()["status"] not in orders.ALLOWED:
+                return await _answer(cb_id, "This order was already updated.", alert=True)
             PENDING_DECLINE[chat_id] = (order_id, time.time() + 300)
             await _answer(cb_id, "Send the reason")
             return await _reply(chat_id, f"Why is order #{order_id} declined? Reply with a short reason "
                                          "(the customer will see it).", reply_markup={"force_reply": True})
-        if orders.transition(conn, o["venue_id"], order_id, action):
+        row, error = orders.transition(conn, o["venue_id"], order_id, action)
+        if row:
             await _answer(cb_id, "Done")
         else:
-            await _answer(cb_id, "Already updated")
+            return await _answer(cb_id, error, alert=True)
     finally:
         conn.close()
     await events.announce(order_id)

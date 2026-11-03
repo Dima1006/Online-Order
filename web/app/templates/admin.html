@@ -35,9 +35,9 @@
 {% if blocked %}
 <ul class="history">
   {% for u in blocked %}
-  <li><span>{{ u.name }} <span class="muted">{{ u.email }}</span></span>
-    <span class="badge">{{ "blocked" if u.is_blocked else u.warning_count ~ " warning" }}</span>
-    <form method="post" action="/admin/users/{{ u.id }}/unblock" class="inline">
+  <li><span>{{ u.name }} <span class="muted">{{ u.email }} at {{ u.venue_name }}</span></span>
+    <span class="badge">{{ "blocked" if u.blocked else u.warnings ~ " warning" }}</span>
+    <form method="post" action="/admin/flags/{{ u.venue_id }}/{{ u.user_id }}/unblock" class="inline">
 <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">Reset</button></form></li>
   {% endfor %}
 </ul>

@@ -8,6 +8,7 @@
   {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
   <form method="post" action="/venue/register">
 <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
     <label>Venue name <input name="venue_name" value="{{ form.venue_name or '' }}" required maxlength="80"></label>
     <label>City <input name="city" value="{{ form.city or '' }}" maxlength="60"></label>
     <label>Email <input type="email" name="email" value="{{ form.email or '' }}" required autocomplete="email"></label>

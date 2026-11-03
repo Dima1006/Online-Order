@@ -26,3 +26,12 @@ Checked by `tests/test_smoke.py` (CSRF, login required, venue isolation, WebSock
 - No audit log, no CAPTCHA, no dependency scanning in CI, SQLite backups are manual.
 - Not yet tested against the real Telegram and Google servers (no internet access in the build sandbox).
 - GDPR: add a privacy policy and terms page before collecting real customer data.
+
+## Update: stage 2 hardening
+- Per-IP rate limits (all pages / POST / search), request body capped at 100 KB (counted while streaming), WebSocket frame size capped, open sockets per IP limited.
+- Password hashing runs in a bounded pool, so a login flood cannot exhaust memory or CPU.
+- Slow database queries are aborted after 3 s.
+- Honeypot fields on public forms; idempotent order submission; per-user and per-venue order limits.
+- Venue password change/reset (reset links are never written to the log unless MAIL_LOG_BODY=1).
+- Static files are served with content hashes and long caching; strict CSP, no third-party fonts or scripts.
+- Known gaps: no CAPTCHA yet, in-memory limiter works for a single process only, Telegram and Google login have not been tested against the real services.

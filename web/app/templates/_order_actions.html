@@ -2,15 +2,19 @@
 <div class="actions">
   {% for nxt in ALLOWED[o.status] if nxt != "declined" %}
   <form method="post" action="/panel/orders/{{ o.id }}/status" class="inline">
-<input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="status" value="{{ nxt }}">
     <input type="hidden" name="next" value="{{ next_url or '/panel' }}">
+    {% if nxt == "no_show" and not o.can_no_show %}
+    <button class="btn ghost" disabled title="A no-show can be marked from {{ o.no_show_from }}, a short while after the promised arrival">No-show from {{ o.no_show_from }}</button>
+    {% else %}
     <button class="btn {{ 'ghost' if nxt == 'no_show' else '' }}">{{ ACTION_LABELS[nxt] }}</button>
+    {% endif %}
   </form>
   {% endfor %}
   {% if o.status in ALLOWED %}
   <form method="post" action="/panel/orders/{{ o.id }}/status" class="inline decline">
-<input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="status" value="declined">
     <input type="hidden" name="next" value="{{ next_url or '/panel' }}">
     <input name="reason" placeholder="Reason for declining" maxlength="200" required aria-label="Reason for declining">

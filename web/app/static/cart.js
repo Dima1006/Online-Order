@@ -88,6 +88,25 @@
     if (b) change(b.dataset.variant, Number(b.dataset.delta));
   });
 
+  // Category chips: open the category and scroll to it.
+  document.querySelectorAll(".chip").forEach((chip) => chip.addEventListener("click", () => {
+    const target = document.getElementById(chip.dataset.target);
+    if (!target) return;
+    if (target.tagName === "DETAILS") target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+
+  // "Order again": fill the cart from the earlier order, then drop ?reorder from the address.
+  const re = document.getElementById("reorder-data");
+  if (re) {
+    try {
+      cart = {};
+      for (const [id, qty] of Object.entries(JSON.parse(re.textContent))) if (menu[id]) cart[id] = Math.min(20, Number(qty) || 0);
+      save();
+      history.replaceState(null, "", location.pathname);
+    } catch (e) {}
+  }
+
   render();
   // Re-open the dropdowns that already contain something from the saved order.
   for (const id of Object.keys(cart)) {

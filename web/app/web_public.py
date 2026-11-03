@@ -1,5 +1,8 @@
 """Pages everybody can see: search, venue menu, placing an order."""
+import json
+import secrets
 import sqlite3
+import time
 
 from starlette.exceptions import HTTPException
 from starlette.responses import RedirectResponse
@@ -10,10 +13,19 @@ from .core import admin_ok, current_user, current_venue, go, read_form, render, 
 from .security import limiter
 from .utils import clean, normalize
 
+SEARCH_LIMIT = 50
+INDEX_TTL = 15  # seconds; menu and approval changes call invalidate_index() so they show up at once
 
-def search_venues(conn: sqlite3.Connection, q: str):
-    """Approved venues matching every word of the query against venue fields, categories and dish names."""
-    tokens = normalize(q).split()
+_index: dict = {"at": 0.0, "venues": [], "dishes": {}}
+
+
+def invalidate_index() -> None:
+    _index["at"] = 0.0
+
+
+def _load_index(conn: sqlite3.Connection) -> None:
+    """One pass over the approved venues and their dishes, kept in memory for a few seconds,
+    so typing in the search box does not hit the database on every keystroke."""
     venues = conn.execute(
         """SELECT v.*, (SELECT COUNT(*) FROM items i WHERE i.venue_id = v.id AND i.is_available = 1) AS item_count
            FROM venues v WHERE v.status = 'approved'""").fetchall()
@@ -22,27 +34,33 @@ def search_venues(conn: sqlite3.Connection, q: str):
             "SELECT i.venue_id, i.name AS item, c.name AS category FROM items i "
             "JOIN categories c ON c.id = i.category_id WHERE i.is_available = 1"):
         dishes.setdefault(r["venue_id"], []).append((r["item"], normalize(r["item"] + " " + r["category"])))
+    _index.update(at=time.monotonic(), venues=[
+        (dict(v), normalize(" ".join((v["name"], v["city"], v["address"], v["description"]))), normalize(v["name"]))
+        for v in venues if v["item_count"]], dishes=dishes)
+
+
+def search_venues(conn: sqlite3.Connection, q: str):
+    """Approved venues matching every word of the query against venue fields, categories and dish names."""
+    if time.monotonic() - _index["at"] > INDEX_TTL:
+        _load_index(conn)
+    tokens = normalize(q).split()[:8]
     results = []
-    for v in venues:
-        if not v["item_count"]:
-            continue
-        own = normalize(" ".join((v["name"], v["city"], v["address"], v["description"])))
+    for v, own, name_norm in _index["venues"]:
         matched, ok = [], True
         for token in tokens:
             if token in own:
                 continue
-            hits = [name for name, text in dishes.get(v["id"], []) if token in text]
+            hits = [name for name, text in _index["dishes"].get(v["id"], []) if token in text]
             if not hits:
                 ok = False
                 break
             matched.extend(hits)
         if ok:
-            name_norm = normalize(v["name"])
-            name_hits = sum(1 for t in tokens if t in name_norm)
-            results.append((-name_hits, not v["accepting_orders"], name_norm,
-                            dict(v, matched=list(dict.fromkeys(matched))[:3])))
+            is_open, state = orders.venue_state(v)  # depends on the clock, so never cached
+            results.append((-sum(1 for t in tokens if t in name_norm), not is_open, name_norm,
+                            dict(v, matched=list(dict.fromkeys(matched))[:3], is_open=is_open, state=state)))
     results.sort(key=lambda r: r[:3])
-    return [r[3] for r in results]
+    return [r[3] for r in results[:SEARCH_LIMIT]]
 
 
 @route
@@ -81,21 +99,34 @@ def visible_venue(request, conn, slug: str):
     return venue
 
 
-def venue_context(request, conn, venue, form=None):
+def venue_context(request, conn, venue, form=None, reorder=None):
     menu = [c for c in load_menu(conn, venue["id"]) if c["items"]]
-    can_order = venue["status"] == "approved" and bool(venue["accepting_orders"])
+    ok, why = orders.venue_availability(venue)
+    options = orders.arrival_options(venue) if ok else []
+    if ok and not options:
+        why = f"Too late to order for today. Opening hours: {orders.hours_text(venue)}."
     menu_data = {str(v["id"]): {"name": i["name"], "label": v["label"], "price": v["price"]}
                  for c in menu for i in c["items"] if i["is_available"] for v in i["variants"]}
     user = current_user(request)
-    needs_verification = bool(user and not user["email_verified"] and not cfg.DEMO_MODE)
-    return dict(venue=venue, menu=menu, menu_data=menu_data, form=form or {}, can_order=can_order,
-                needs_verification=needs_verification)
+    minutes = [m for m, _ in options]
+    wanted = (form or {}).get("arrival")
+    default_arrival = wanted if wanted in minutes else (15 if 15 in minutes else (minutes[0] if minutes else 0))
+    return dict(venue=venue, menu=menu, menu_data=menu_data, form=form or {},
+                can_order=ok and bool(options), closed_reason=why, arrival_options=options,
+                default_arrival=default_arrival, submit_key=secrets.token_urlsafe(16),
+                hours=orders.hours_text(venue), reorder=reorder,
+                needs_verification=bool(user and not user["email_verified"] and not cfg.DEMO_MODE))
 
 
 @route
 async def venue_page(request, conn):
     venue = visible_venue(request, conn, request.path_params["slug"])
-    return render(request, "venue.html", **venue_context(request, conn, venue))
+    reorder = None
+    user = current_user(request)
+    raw = request.query_params.get("reorder", "")
+    if user and raw.isdigit():
+        reorder = orders.reorder_cart(conn, venue["id"], user["id"], int(raw)) or None
+    return render(request, "venue.html", **venue_context(request, conn, venue, reorder=reorder))
 
 
 @route
@@ -121,7 +152,8 @@ async def place_order(request, conn):
 
     if not user["email_verified"] and not cfg.DEMO_MODE:
         return fail("Please confirm your email address first (we sent you a link). You can resend it in My account.")
-    order_id, error = orders.create_order(conn, venue, user, arrival, note, str(form.get("cart", "[]")))
+    order_id, error = orders.create_order(conn, venue, user, arrival, note, str(form.get("cart", "[]")),
+                                          str(form.get("submit_key", "")))
     if error:
         return fail(error)
     await events.announce(order_id, new=True)

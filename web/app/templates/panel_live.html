@@ -6,9 +6,31 @@
   <h1>Live orders</h1>
   <span class="conn" id="conn" data-state="connecting">Connecting…</span>
   <button type="button" class="btn ghost" id="sound-toggle">Sound: off</button>
+  {% if paused %}
+  <form method="post" action="/panel/pause" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="minutes" value="0"><button class="btn">Resume orders</button></form>
+  {% elif venue.status == "approved" %}
+  <form method="post" action="/panel/pause" class="inline pause">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <select name="minutes" aria-label="Pause for"><option value="15">15 min</option><option value="30">30 min</option><option value="60">60 min</option></select>
+    <button class="btn ghost">Pause orders</button>
+  </form>
+  {% endif %}
 </div>
+
+{% if show_checklist %}
+<section class="checklist">
+  <h2>Get your venue ready</h2>
+  <ul>
+    {% for label, done, link in checklist %}
+    <li class="{{ 'done' if done else '' }}"><span class="tick" aria-hidden="true">{{ "✓" if done else "" }}</span>
+      {% if link and not done %}<a href="{{ link }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <div id="live-box" data-live-url="/panel/live/fragment" data-live-ws="/ws/panel" data-live-sound="1">
   <div id="live-content">{% set new_count = active | selectattr("status", "equalto", "new") | list | length %}{% include "_live.html" %}</div>
 </div>
 {% endblock %}
-{% block scripts %}<script src="/static/live.js"></script>{% endblock %}
+{% block scripts %}<script src="{{ static('live.js') }}"></script>{% endblock %}

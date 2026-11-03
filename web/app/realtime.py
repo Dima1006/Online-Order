@@ -4,12 +4,16 @@ from collections import defaultdict
 
 from starlette.websockets import WebSocketDisconnect
 
+from . import config as cfg
+
 MAX_PER_CHANNEL = 20
+MAX_MESSAGE_CHARS = 16  # clients only ever send "ping"
 
 
 class Hub:
     def __init__(self):
         self.channels: dict[str, set[asyncio.Queue]] = defaultdict(set)
+        self.per_ip: dict[str, int] = defaultdict(int)
 
     def subscribe(self, channels: list[str]) -> asyncio.Queue | None:
         if any(len(self.channels[c]) >= MAX_PER_CHANNEL for c in channels):
@@ -37,12 +41,17 @@ class Hub:
 hub = Hub()
 
 
-async def serve(ws, channels: list[str]) -> None:
+async def serve(ws, channels: list[str], ip: str = "") -> None:
     """Accept the socket and forward hub messages until the client goes away."""
+    if ip and hub.per_ip[ip] >= cfg.WS_MAX_PER_IP:
+        await ws.close(code=1013)  # too many connections from one address
+        return
     q = hub.subscribe(channels)
     if q is None:
         await ws.close(code=1013)  # try again later
         return
+    if ip:
+        hub.per_ip[ip] += 1
     await ws.accept()
     getter = asyncio.ensure_future(q.get())
     receiver = asyncio.ensure_future(ws.receive())
@@ -53,7 +62,11 @@ async def serve(ws, channels: list[str]) -> None:
                 msg = receiver.result()
                 if msg["type"] == "websocket.disconnect":
                     break
-                if msg.get("text") == "ping":  # client heartbeat keeps proxies from closing idle sockets
+                text = msg.get("text")
+                if msg.get("bytes") or (text is not None and len(text) > MAX_MESSAGE_CHARS):
+                    await ws.close(code=1009)  # message too big: we never expect more than "ping"
+                    break
+                if text == "ping":  # client heartbeat keeps proxies from closing idle sockets
                     await ws.send_text("pong")
                 receiver = asyncio.ensure_future(ws.receive())
             if getter in done:
@@ -65,3 +78,7 @@ async def serve(ws, channels: list[str]) -> None:
         getter.cancel()
         receiver.cancel()
         hub.unsubscribe(q)
+        if ip:
+            hub.per_ip[ip] -= 1
+            if hub.per_ip[ip] <= 0:
+                del hub.per_ip[ip]

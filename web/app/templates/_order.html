@@ -1,14 +1,27 @@
 <article class="receipt">
   <p class="muted">{{ order.venue_name }}{% if order.venue_address %}, {{ order.venue_address }}{% endif %}</p>
   <h1 class="status status-{{ order.status }}">{{ order.status_label }}</h1>
+  {% set flow = ["new", "preparing", "ready", "completed"] %}
+  {% if order.status in flow %}
+  <ol class="steps" aria-label="Order progress">
+    {% for s in flow %}
+    {% set idx = loop.index0 %}{% set cur = flow.index(order.status) %}
+    <li class="{{ 'done' if idx < cur else ('current' if idx == cur else '') }}">{{ STATUS_LABELS[s] if s != "new" else "Sent" }}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
   {% if order.status == "declined" %}
     <p>The venue could not accept this order: {{ order.decline_reason }}</p>
   {% elif order.status == "no_show" %}
-    <p>The venue marked this order as not picked up.</p>
+    <p>The venue marked this order as not picked up. This counts as a no-show warning at this venue.</p>
+  {% elif order.status == "cancelled" %}
+    <p>You cancelled this order.</p>
+  {% elif order.status == "expired" %}
+    <p>The venue did not handle this order in time, so it was closed. You were not charged and got no warning.</p>
   {% elif order.status == "completed" %}
     <p>Enjoy! Thanks for ordering.</p>
   {% else %}
-    <p>Expected at <strong>{{ order.arrival_local }}</strong> (in {{ order.arrival_minutes }} min from {{ order.created_local }}). This page updates by itself.</p>
+    <p>{% if order.status == "ready" %}Your order is ready.{% endif %} Expected at <strong>{{ order.arrival_local }}</strong> (ordered at {{ order.created_local }}). This page updates by itself.</p>
   {% endif %}
   <ul class="lines">
     {% for it in order["items"] %}
@@ -17,5 +30,13 @@
   </ul>
   <p class="cart-total"><span>Total, pay at the venue</span><strong>{{ order.total | zl }}</strong></p>
   <p class="muted small">Order for {{ order.customer_name }}.</p>
-  <a class="btn ghost" href="/v/{{ order.venue_slug }}">Back to menu</a>
+  <div class="actions">
+    <a class="btn ghost" href="/v/{{ order.venue_slug }}">Back to menu</a>
+    {% if order.status not in ("new", "preparing", "ready") %}<a class="btn ghost" href="/v/{{ order.venue_slug }}?reorder={{ order.id }}">Order again</a>{% endif %}
+    {% if order.can_cancel %}
+    <form method="post" action="/order/{{ order.id }}/cancel" class="inline" data-confirm="Cancel this order?">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost danger-text">Cancel order</button>
+    </form>
+    {% endif %}
+  </div>
 </article>

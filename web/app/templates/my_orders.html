@@ -11,6 +11,7 @@
     <a href="/order/{{ o.id }}"><strong>#{{ o.id }} · {{ o.venue_name }}</strong><span class="muted"> {{ o.created_date }} {{ o.created_local }}</span></a>
     <span class="badge status-{{ o.status }}">{{ o.status_label }}</span>
     <span>{{ o.total | zl }}</span>
+    <a class="small" href="/v/{{ o.venue_slug }}?reorder={{ o.id }}">Order again</a>
   </li>
   {% endfor %}
 </ul>
@@ -18,4 +19,4 @@
 </div>
 </div>
 {% endblock %}
-{% block scripts %}<script src="/static/live.js"></script>{% endblock %}
+{% block scripts %}<script src="{{ static('live.js') }}"></script>{% endblock %}

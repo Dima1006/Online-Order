@@ -1,7 +1,6 @@
-<a href="/panel">Live</a>
+<a href="/panel">Live{% if ven_new %} <span class="pill" title="New orders">{{ ven_new }}</span>{% endif %}</a>
 <a href="/panel/orders">Orders</a>
 <a href="/panel/menu">Menu</a>
 <a href="/panel/settings">Settings</a>
 <a href="/v/{{ venue.slug }}" target="_blank" rel="noopener">Public page</a>
-<form method="post" action="/logout" class="inline">
-<input type="hidden" name="csrf" value="{{ csrf }}"><button class="linklike">Log out</button></form>
+<form method="post" action="/logout" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="linklike">Log out</button></form>

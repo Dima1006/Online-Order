@@ -5,16 +5,43 @@
 <h1>Settings</h1>
 {% if venue.status == "pending" %}<div class="notice">Your venue is waiting for approval. Until then it is not listed and cannot take orders. You can already prepare the menu.</div>
 {% elif venue.status != "approved" %}<div class="notice error">Your venue is {{ venue.status }}. Contact us if you think this is a mistake.</div>{% endif %}
+
 <form method="post" action="/panel/settings/save" class="stack narrow">
-<input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Venue</h2>
   <label>Venue name <input name="name" value="{{ venue.name }}" required maxlength="80"></label>
   <label>City <input name="city" value="{{ venue.city }}" maxlength="60"></label>
   <label>Street address <input name="address" value="{{ venue.address }}" maxlength="120"></label>
   <label>Short description <textarea name="description" rows="3" maxlength="300">{{ venue.description }}</textarea></label>
+
+  <h2 class="gap">Taking orders</h2>
   <label class="check"><input type="checkbox" name="accepting_orders" {{ 'checked' if venue.accepting_orders else '' }}> Accepting orders</label>
+  <div class="pair">
+    <label>Opens <input type="time" name="open_time" value="{{ venue.open_time }}" required></label>
+    <label>Closes <input type="time" name="close_time" value="{{ venue.close_time }}" required></label>
+  </div>
+  <p class="muted small">Warsaw time. Put the same time twice (00:00 and 00:00) to be open all day. Customers can only choose an arrival time inside these hours.</p>
+  <label>Earliest arrival customers can choose
+    <select name="prep_minutes">
+      {% for m in PREP_CHOICES %}<option value="{{ m }}" {{ 'selected' if m == venue.prep_minutes else '' }}>{{ m }} minutes after ordering</option>{% endfor %}
+    </select>
+  </label>
+  <label>Stop taking orders above this many active orders <input type="number" name="max_active" min="1" max="100" value="{{ venue.max_active }}" required></label>
   <button class="btn">Save</button>
 </form>
 <p class="muted">Your public page: <a href="/v/{{ venue.slug }}">/v/{{ venue.slug }}</a>. It is listed once it is approved and has at least one available item.</p>
+
+<h2 class="gap">Customers with no-shows</h2>
+<p class="muted small">You can mark a no-show {{ grace }} minutes after the promised arrival time. After {{ max_no_shows }} no-shows a customer cannot order from you any more. This only affects your venue.</p>
+{% if flags %}
+<ul class="history">
+  {% for f in flags %}
+  <li><span>{{ f.name }} <span class="muted">{{ f.email }}</span></span>
+    <span class="badge">{{ "blocked" if f.blocked else f.warnings ~ " warning" }}</span>
+    <form method="post" action="/panel/customers/{{ f.user_id }}/reset" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">Unblock</button></form></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">None.</p>{% endif %}
 
 <h2 class="gap">Telegram</h2>
 {% if not tg_enabled %}
@@ -25,8 +52,7 @@
 <ul class="history">
   {% for c in chats %}
   <li><span>{{ c.title or "Chat" }}</span><span class="muted">connected {{ c.created_at[:10] }}</span>
-    <form method="post" action="/panel/telegram/{{ c.id }}/disconnect" class="inline">
-<input type="hidden" name="csrf" value="{{ csrf }}"><button class="linklike danger-text">Disconnect</button></form></li>
+    <form method="post" action="/panel/telegram/{{ c.id }}/disconnect" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="linklike danger-text">Disconnect</button></form></li>
   {% endfor %}
 </ul>
 {% endif %}
@@ -37,7 +63,15 @@
 {% elif not tg_ready %}
 <p class="muted">The bot is still starting. Reload in a few seconds.</p>
 {% endif %}
-<form method="post" action="/panel/telegram/link">
-<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">{{ "Create a new link" if tg_link else "Connect Telegram" }}</button></form>
+<form method="post" action="/panel/telegram/link"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost">{{ "Create a new link" if tg_link else "Connect Telegram" }}</button></form>
 {% endif %}
+
+<h2 class="gap">Password</h2>
+<form method="post" action="/panel/password" class="stack narrow">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Current password <input type="password" name="current_password" required autocomplete="current-password"></label>
+  <label>New password <span class="muted">(10+ characters)</span> <input type="password" name="new_password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
+  <button class="btn">Change password</button>
+</form>
+<p class="muted small">Login email: {{ venue.email }}</p>
 {% endblock %}

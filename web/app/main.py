@@ -11,13 +11,32 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
 from . import config as cfg
-from . import db, telegram, web_account, web_admin, web_public, web_venue
-from .core import BASE_DIR, Redirect, http_error, redirect_handler, server_error
+from . import db, events, orders, telegram, web_account, web_admin, web_public, web_venue
+from .core import BASE_DIR, Redirect, http_error, redirect_handler, render, route, server_error
 from .security import SecurityMiddleware
 from .seed import seed_demo
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("coffee")
+
+
+def _expire_once() -> list[int]:
+    conn = db.connect()
+    try:
+        return orders.expire_stale(conn)
+    finally:
+        conn.close()
+
+
+async def expire_loop() -> None:
+    """Every minute: close orders nobody handled (and tell whoever is watching them)."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            for order_id in await asyncio.to_thread(_expire_once):
+                await events.announce(order_id)
+        except Exception as exc:
+            log.error("expire loop failed: %s", type(exc).__name__)
 
 
 @asynccontextmanager
@@ -27,12 +46,19 @@ async def lifespan(app):
         seed_demo()
     if not cfg.ADMIN_PASSWORD:
         log.info("ADMIN_PASSWORD is not set: the admin area (/admin) is disabled, new venues cannot be approved.")
-    bot = asyncio.create_task(telegram.run()) if cfg.TELEGRAM_BOT_TOKEN else None
+    background = [asyncio.create_task(expire_loop())]
+    if cfg.TELEGRAM_BOT_TOKEN:
+        background.append(asyncio.create_task(telegram.run()))
     try:
         yield
     finally:
-        if bot:
-            bot.cancel()
+        for task in background:
+            task.cancel()
+
+
+@route
+async def for_venues(request, conn):
+    return render(request, "for_venues.html")
 
 
 async def healthz(request):
@@ -43,6 +69,7 @@ G, P, GP = ["GET"], ["POST"], ["GET", "POST"]
 routes = [
     Route("/", web_public.home),
     Route("/healthz", healthz),
+    Route("/for-venues", for_venues),
     Route("/v/{slug}", web_public.venue_page),
     Route("/v/{slug}/order", web_public.place_order, methods=P),
     # customers
@@ -62,12 +89,16 @@ routes = [
     Route("/my-orders", web_account.my_orders),
     Route("/order/{order_id:int}", web_account.order_page),
     Route("/order/{order_id:int}/fragment", web_account.order_fragment),
+    Route("/order/{order_id:int}/cancel", web_account.order_cancel, methods=P),
     WebSocketRoute("/ws/me", web_account.ws_me),
     # venues
     Route("/venue/register", web_venue.venue_register, methods=GP),
     Route("/venue/login", web_venue.venue_login, methods=GP),
+    Route("/venue/forgot", web_venue.venue_forgot, methods=GP),
+    Route("/venue/reset/{token}", web_venue.venue_reset, methods=GP),
     Route("/panel", web_venue.panel_live),
     Route("/panel/live/fragment", web_venue.panel_live_fragment),
+    Route("/panel/pause", web_venue.panel_pause, methods=P),
     Route("/panel/orders", web_venue.panel_orders),
     Route("/panel/orders/{order_id:int}/status", web_venue.order_status, methods=P),
     WebSocketRoute("/ws/panel", web_venue.ws_panel),
@@ -81,13 +112,15 @@ routes = [
     Route("/panel/menu/item/{item_id:int}/delete", web_venue.delete_item, methods=P),
     Route("/panel/settings", web_venue.panel_settings),
     Route("/panel/settings/save", web_venue.save_settings, methods=P),
+    Route("/panel/password", web_venue.panel_password, methods=P),
+    Route("/panel/customers/{user_id:int}/reset", web_venue.reset_customer, methods=P),
     Route("/panel/telegram/link", web_venue.telegram_link, methods=P),
     Route("/panel/telegram/{chat_pk:int}/disconnect", web_venue.telegram_disconnect, methods=P),
     # admin
     Route("/admin/login", web_admin.admin_login, methods=GP),
     Route("/admin", web_admin.admin_home),
     Route("/admin/venues/{venue_id:int}/{action}", web_admin.admin_venue_action, methods=P),
-    Route("/admin/users/{user_id:int}/unblock", web_admin.admin_unblock_user, methods=P),
+    Route("/admin/flags/{venue_id:int}/{user_id:int}/unblock", web_admin.admin_unblock_user, methods=P),
     Mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static"),
 ]
 

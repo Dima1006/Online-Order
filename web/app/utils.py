@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import os
 import re
+import threading
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
@@ -102,6 +103,9 @@ def parse_variants(labels, prices) -> list[tuple[str, int]]:
         raise ValueError("At most 10 sizes per item.")
     if len(rows) > 1 and any(not label for label, _ in rows):
         raise ValueError("When there are several sizes, give each one a name (e.g. Small).")
+    names = [normalize(label) for label, _ in rows]
+    if len(set(names)) != len(names):
+        raise ValueError("Two sizes have the same name.")
     return rows
 
 
@@ -150,3 +154,88 @@ def dummy_hash() -> str:
 def session_fingerprint(password_hash: str | None) -> str:
     """Stored in the session; changes when the password changes, which logs out every other session."""
     return hashlib.sha256((password_hash or "").encode()).hexdigest()[:12]
+
+
+# ---------------------------------------------------------------- validation helpers
+
+def normalize_phone(raw: str) -> str | None:
+    """'' stays ''. A Polish number (9 digits, or +48 / 0048 prefix) becomes '+48 600 123 456'.
+    Other international numbers must start with + and have 8-15 digits. Returns None when invalid."""
+    raw = raw.strip()
+    if not raw:
+        return ""
+    if not re.fullmatch(r"[+\d\s().\-]{7,25}", raw):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if raw.startswith("00"):
+        digits, international = digits[2:], True
+    else:
+        international = raw.startswith("+")
+    if not international:
+        if len(digits) != 9:
+            return None
+        digits = "48" + digits
+    if digits.startswith("48"):
+        if len(digits) != 11 or digits[2] == "0":
+            return None
+        return f"+48 {digits[2:5]} {digits[5:8]} {digits[8:]}"
+    return "+" + digits if 8 <= len(digits) <= 15 else None
+
+
+def name_problem(name: str) -> str | None:
+    if len(name) < 2:
+        return "Enter your name (at least 2 characters)."
+    if re.search(r"https?:|www\.|@|\d{4,}", name, re.I):
+        return "Please enter your name without links or long numbers."
+    return None
+
+
+def parse_hhmm(text: str) -> int | None:
+    """'08:30' -> minutes since midnight, or None."""
+    m = re.fullmatch(r"([01]\d|2[0-3]):([0-5]\d)", text.strip())
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else None
+
+
+def is_open_at(open_min: int, close_min: int, minute_of_day: int) -> bool:
+    """Opening hours may pass midnight (18:00-02:00). open == close means open all day."""
+    if open_min == close_min:
+        return True
+    if open_min < close_min:
+        return open_min <= minute_of_day < close_min
+    return minute_of_day >= open_min or minute_of_day < close_min
+
+
+# ---------------------------------------------------------------- bounded password hashing
+
+class Busy(Exception):
+    """All hashing slots are taken (see HASH_CONCURRENCY)."""
+
+
+_slots = None
+
+
+def _hash_slots():
+    global _slots
+    if _slots is None:
+        from . import config as cfg
+        _slots = threading.BoundedSemaphore(cfg.HASH_CONCURRENCY)
+    return _slots
+
+
+def hash_password_limited(password: str) -> str:
+    """scrypt needs ~16 MB; never compute more than HASH_CONCURRENCY at once, wait briefly, then give up."""
+    if not _hash_slots().acquire(timeout=8):
+        raise Busy
+    try:
+        return hash_password(password)
+    finally:
+        _hash_slots().release()
+
+
+def verify_password_limited(password: str, stored: str) -> bool:
+    if not _hash_slots().acquire(timeout=8):
+        raise Busy
+    try:
+        return verify_password(password, stored)
+    finally:
+        _hash_slots().release()

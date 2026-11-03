@@ -2,8 +2,10 @@
 {% block title %}My account · {{ APP_NAME }}{% endblock %}
 {% block content %}
 <h1>My account</h1>
-{% if user.is_blocked %}<div class="notice error">Your account is blocked after repeated no-shows. Please contact the venue.</div>
-{% elif user.warning_count %}<div class="notice">You have {{ user.warning_count }} no-show warning. After {{ 2 }} you cannot place orders.</div>{% endif %}
+{% for f in flags %}
+  {% if f.blocked %}<div class="notice error">{{ f.venue_name }} blocked your orders after repeated no-shows. Please contact the venue.</div>
+  {% else %}<div class="notice">{{ f.venue_name }}: {{ f.warnings }} no-show warning. After {{ max_no_shows }} the venue stops taking your orders.</div>{% endif %}
+{% endfor %}
 
 <div class="two-col">
 <section>
@@ -11,7 +13,7 @@
   <form method="post" action="/account/update" class="stack">
 <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Name <input name="name" value="{{ user.name }}" required maxlength="60"></label>
-    <label>Phone <span class="muted">(optional)</span> <input type="tel" name="phone" value="{{ user.phone }}" maxlength="30"></label>
+    <label>Phone <span class="muted">(optional, e.g. 600 123 456)</span> <input type="tel" name="phone" value="{{ user.phone }}" maxlength="40"></label>
     <label>Email <input value="{{ user.email }}" disabled></label>
     <p class="muted small">{% if user.email_verified %}Email confirmed.{% else %}Email not confirmed yet. You need to confirm it to place orders.{% endif %}</p>
     <button class="btn">Save</button>

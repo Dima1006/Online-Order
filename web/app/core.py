@@ -9,11 +9,13 @@ from starlette.exceptions import HTTPException
 from starlette.responses import RedirectResponse
 from starlette.templating import Jinja2Templates
 
+from starlette.concurrency import run_in_threadpool
+
 from . import config as cfg
-from . import db, google
+from . import db, google, orders
 from .orders import ACTION_LABELS, ALLOWED, ARRIVAL_CHOICES, STATUS_LABELS
 from .security import csrf_token, csrf_valid
-from .utils import format_zl, session_fingerprint
+from .utils import (Busy, format_zl, hash_password_limited, session_fingerprint, verify_password_limited)
 
 log = logging.getLogger("coffee")
 BASE_DIR = Path(__file__).resolve().parent
@@ -22,8 +24,37 @@ ADMIN_SESSION_SECONDS = 8 * 3600
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["zl"] = format_zl
+
+_static_versions: dict[str, int] = {}
+
+
+def static_url(path: str) -> str:
+    """/static/x.js?v=<file time>: browsers cache it for a year and still get new code after a deploy."""
+    if path not in _static_versions:
+        try:
+            _static_versions[path] = int((BASE_DIR / "static" / path).stat().st_mtime)
+        except OSError:
+            _static_versions[path] = 0
+    return f"/static/{path}?v={_static_versions[path]}"
+
+
 templates.env.globals.update(APP_NAME=APP_NAME, STATUS_LABELS=STATUS_LABELS, ACTION_LABELS=ACTION_LABELS,
-                             ALLOWED=ALLOWED, ARRIVAL_CHOICES=ARRIVAL_CHOICES)
+                             ALLOWED=ALLOWED, ARRIVAL_CHOICES=ARRIVAL_CHOICES, static=static_url)
+
+
+async def hash_async(password: str) -> str:
+    """scrypt in a worker thread, at most HASH_CONCURRENCY at a time (each uses ~16 MB of memory)."""
+    try:
+        return await run_in_threadpool(hash_password_limited, password)
+    except Busy:
+        raise HTTPException(503, "The server is busy right now. Please try again in a moment.")
+
+
+async def verify_async(password: str, stored: str) -> bool:
+    try:
+        return await run_in_threadpool(verify_password_limited, password, stored)
+    except Busy:
+        raise HTTPException(503, "The server is busy right now. Please try again in a moment.")
 
 
 class Redirect(Exception):
@@ -132,8 +163,16 @@ def go(request, url: str, error: str | None = None, msg: str | None = None):
 
 
 def render(request, name: str, status_code: int = 200, *, fragment: bool = False, **ctx):
-    ctx.update(csrf=csrf_token(request), me=current_user(request), ven=current_venue(request),
-               is_admin=admin_ok(request), google_enabled=google.enabled(), demo=cfg.DEMO_MODE)
+    me, ven = current_user(request), current_venue(request)
+    conn = request.state.__dict__.get("conn")
+    ctx.update(csrf=csrf_token(request), me=me, ven=ven, is_admin=admin_ok(request),
+               google_enabled=google.enabled(), demo=cfg.DEMO_MODE, active_order=None, ven_new=0)
+    if conn is not None and not fragment:
+        if me:  # banner: "your order is being prepared"
+            ctx["active_order"] = orders.active_order_of(conn, me["id"])
+        if ven:  # badge on "Live" in the venue navigation
+            ctx["ven_new"] = conn.execute("SELECT COUNT(*) FROM orders WHERE venue_id = ? AND status = 'new'",
+                                          (ven["id"],)).fetchone()[0]
     ctx["flashes"] = [] if fragment else request.session.pop("flash", [])
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 

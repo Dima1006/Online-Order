@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Venue password · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Forgot venue password</h1>
+  <form method="post" action="/venue/forgot">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Venue email <input type="email" name="email" required autocomplete="email"></label>
+    <button class="btn wide">Send reset link</button>
+  </form>
+</section>
+{% endblock %}

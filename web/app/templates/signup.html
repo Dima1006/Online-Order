@@ -12,9 +12,10 @@
   <form method="post" action="/signup">
 <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="next" value="{{ next }}">
+    <div class="hp" aria-hidden="true"><label>Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label></div>
     <label>Name <input name="name" value="{{ form.name or '' }}" required maxlength="60" autocomplete="name"></label>
     <label>Email <input type="email" name="email" value="{{ form.email or '' }}" required autocomplete="email"></label>
-    <label>Phone <span class="muted">(optional, so the venue can reach you)</span> <input type="tel" name="phone" value="{{ form.phone or '' }}" maxlength="30" autocomplete="tel"></label>
+    <label>Phone <span class="muted">(optional, e.g. 600 123 456)</span> <input type="tel" name="phone" value="{{ form.phone or '' }}" maxlength="40" autocomplete="tel"></label>
     <label>Password <span class="muted">(10+ characters)</span> <input type="password" name="password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
     <button class="btn wide">Create account</button>
   </form>

@@ -35,3 +35,6 @@ The address changes every run, so Google sign-in does not work there (use e-mail
 `python tests/test_smoke.py` (needs `pip install httpx` for Starlette's test client).
 
 See `SECURITY.md` for the security review.
+
+## Stage 2 update
+New: opening hours, preparation time, pause and capacity limits per venue; no-show grace period and per-venue blocking; order cancel by customer; automatic expiry of stale orders; venue password reset and change; navigation menu and category chips; protection against floods. Run tests: `cd web && python3 -I tests/test_smoke.py`. Run the server with ONE process (`--ws-max-size 1024`). See `docs/ROADMAP.md` for what is next.

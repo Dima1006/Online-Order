@@ -8,6 +8,7 @@ from collections import defaultdict, deque
 from urllib.parse import urlparse
 
 from starlette.datastructures import MutableHeaders
+from starlette.requests import HTTPConnection
 from starlette.responses import PlainTextResponse
 
 from . import config as cfg
@@ -89,8 +90,13 @@ def client_ip(request) -> str:
 _HOST_OK = re.compile(r"^[A-Za-z0-9.\-]+(:\d{1,5})?$")
 
 
+class _BodyTooLarge(Exception):
+    pass
+
+
 class SecurityMiddleware:
-    """Security headers on every response and a cap on request size."""
+    """Per-IP rate limits, a hard cap on request size (counted while reading, so chunked bodies are covered
+    too), security headers on every response and long-lived caching for versioned static files."""
 
     def __init__(self, app):
         self.app = app
@@ -98,20 +104,46 @@ class SecurityMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
-        headers = {k: v for k, v in scope["headers"]}
-        length = headers.get(b"content-length", b"")
+        conn = HTTPConnection(scope)
+        path, method = scope["path"], scope["method"]
+        is_static = path.startswith("/static/")
+        if not is_static and path != "/healthz":
+            ip = client_ip(conn)
+            limits = [("all", cfg.RATE_ALL)]
+            if method == "POST":
+                limits.append(("post", cfg.RATE_POST))
+            if path == "/" and b"partial" in scope.get("query_string", b""):
+                limits.append(("search", cfg.RATE_SEARCH))
+            for name, (limit, window) in limits:
+                if not limiter.allow(f"{name}:{ip}", limit, window):
+                    return await PlainTextResponse("Too many requests. Please slow down.", status_code=429,
+                                                   headers={"Retry-After": "30"})(scope, receive, send)
+        length = conn.headers.get("content-length", "")
         if length.isdigit() and int(length) > cfg.MAX_BODY_BYTES:
             return await PlainTextResponse("Request too large", status_code=413)(scope, receive, send)
-        host = headers.get(b"host", b"").decode("latin-1")
+        host = conn.headers.get("host", "")
         # Safari needs the websocket host spelled out; 'self' alone does not cover ws:// there.
         ws = f" ws://{host} wss://{host}" if _HOST_OK.match(host) else ""
-        csp = ("default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
-               "font-src https://fonts.gstatic.com; img-src 'self' data:; "
-               f"connect-src 'self'{ws}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; "
-               "object-src 'none'")
+        csp = ("default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; "
+               f"connect-src 'self'{ws}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
+
+        received = 0
+
+        async def counting_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > cfg.MAX_BODY_BYTES:
+                    raise _BodyTooLarge
+            return message
+
+        started = False
 
         async def send_wrapper(message):
+            nonlocal started
             if message["type"] == "http.response.start":
+                started = True
                 h = MutableHeaders(scope=message)
                 h["Content-Security-Policy"] = csp
                 h["X-Content-Type-Options"] = "nosniff"
@@ -121,8 +153,14 @@ class SecurityMiddleware:
                 h["Cross-Origin-Opener-Policy"] = "same-origin"
                 if cfg.HTTPS:
                     h["Strict-Transport-Security"] = "max-age=31536000"
-                if h.get("content-type", "").startswith("text/html"):
+                if is_static and message.get("status") == 200:
+                    h["Cache-Control"] = "public, max-age=31536000, immutable"  # URLs carry ?v=<file time>
+                elif h.get("content-type", "").startswith("text/html"):
                     h["Cache-Control"] = "no-store"  # never cache pages that may hold personal data
             await send(message)
 
-        await self.app(scope, receive, send_wrapper)
+        try:
+            await self.app(scope, counting_receive, send_wrapper)
+        except _BodyTooLarge:
+            if not started:
+                await PlainTextResponse("Request too large", status_code=413)(scope, receive, send)
