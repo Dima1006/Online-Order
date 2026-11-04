@@ -6,15 +6,7 @@
 {% if venue.status == "pending" %}<div class="notice">Your venue is waiting for approval. Until then it is not listed and cannot take orders. You can already prepare the menu.</div>
 {% elif venue.status != "approved" %}<div class="notice error">Your venue is {{ venue.status }}. Contact us if you think this is a mistake.</div>{% endif %}
 
-<form method="post" action="/panel/settings/save" class="stack narrow">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>Venue</h2>
-  <label>Venue name <input name="name" value="{{ venue.name }}" required maxlength="80"></label>
-  <label>City <input name="city" value="{{ venue.city }}" maxlength="60"></label>
-  <label>Street address <input name="address" value="{{ venue.address }}" maxlength="120"></label>
-  <label>Short description <textarea name="description" rows="3" maxlength="300">{{ venue.description }}</textarea></label>
-
-  <h2 class="gap">Photo</h2>
+<h2>Photo</h2>
 <form method="post" action="/panel/photo/venue" enctype="multipart/form-data" class="stack narrow">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   {% if venue.image %}<img class="cover" src="/media/{{ venue.image }}" alt="" width="1400" height="700">{% endif %}
@@ -23,7 +15,15 @@
   {% if venue.image %}<button class="linklike danger-text" name="remove" value="1">Remove photo</button>{% endif %}</div>
 </form>
 
-<h2 class="gap">Taking orders</h2>
+<form method="post" action="/panel/settings/save" class="stack narrow">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Venue</h2>
+  <label>Venue name <input name="name" value="{{ venue.name }}" required maxlength="80"></label>
+  <label>City <input name="city" value="{{ venue.city }}" maxlength="60"></label>
+  <label>Street address <input name="address" value="{{ venue.address }}" maxlength="120"></label>
+  <label>Short description <textarea name="description" rows="3" maxlength="300">{{ venue.description }}</textarea></label>
+
+  <h2 class="gap">Taking orders</h2>
   <label class="check"><input type="checkbox" name="accepting_orders" {{ 'checked' if venue.accepting_orders else '' }}> Accepting orders</label>
   <div class="pair">
     <label>Opens <input type="time" name="open_time" value="{{ venue.open_time }}" required></label>

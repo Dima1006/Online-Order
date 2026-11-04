@@ -103,6 +103,22 @@ with TestClient(app, base_url=B) as c:
     v.post(f"/panel/options/group/{syrup}/delete", data={"csrf": t})
     assert one("SELECT COUNT(*) n FROM option_groups WHERE id=?", syrup)["n"] == 0
 
+    # regression: nested <form> tags make browsers drop fields, so "Save" in Settings silently failed
+    from html.parser import HTMLParser
+    class Forms(HTMLParser):
+        def __init__(self): super().__init__(); self.depth = 0; self.nested = False; self.fields = {}; self.cur = None
+        def handle_starttag(self, tag, a):
+            a = dict(a)
+            if tag == "form":
+                self.depth += 1; self.nested |= self.depth > 1; self.cur = a.get("action"); self.fields[self.cur] = set()
+            elif tag in ("input", "select", "textarea") and self.cur: self.fields[self.cur].add(a.get("name"))
+        def handle_endtag(self, tag):
+            if tag == "form": self.depth -= 1; self.cur = None
+    for path in ("/panel/settings", "/panel/menu", "/panel/options", "/panel", "/panel/orders"):
+        f = Forms(); f.feed(v.get(path).text); assert not f.nested, "nested form on " + path
+        if path == "/panel/settings":
+            assert {"name", "open_time", "close_time", "prep_minutes", "max_active"} <= f.fields["/panel/settings/save"]
+
     # ---------------- photos
     t = csrf(v, "/panel/menu")
     def upload(path, data, name="p.png", ctype="image/png", extra=None):
