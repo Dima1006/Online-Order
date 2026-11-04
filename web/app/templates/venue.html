@@ -3,6 +3,7 @@
 {% block body_attrs %}data-slug="{{ venue.slug }}" data-open="{{ 1 if can_order else 0 }}"{% endblock %}
 {% block content %}
 <p class="crumb"><a href="/">‹ All venues</a></p>
+{% if venue.image %}<img class="cover" src="/media/{{ venue.image }}" alt="" width="1400" height="700">{% endif %}
 <div class="venue-head">
   <h1>{{ venue.name }}</h1>
   <p class="muted">{{ [venue.address, venue.city] | select | join(", ") }}{% if venue.status == "approved" %} · Hours: {{ hours }}{% endif %}</p>
@@ -28,19 +29,19 @@
         <li class="item {{ '' if item.is_available else 'soldout' }}" data-variants="{{ vs | map(attribute='id') | join(',') }}">
           {% if not item.is_available %}
           <div class="irow">
-            <div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
+            {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
             <span class="muted">Sold out</span>
           </div>
           {% elif vs | length == 1 %}
           <div class="irow">
-            <div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
+            {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
             <span class="iprice">{{ vs[0].price | zl }}</span>
             <span class="ctl" data-variant="{{ vs[0].id }}"></span>
           </div>
           {% else %}
           <details class="multi">
             <summary class="irow">
-              <div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
+              {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
               <span class="iprice"><span class="muted">from</span> {{ (vs | map(attribute='price') | min) | zl }}</span>
               <span class="incart" hidden></span>
               <span class="chev" aria-hidden="true"></span>
@@ -102,6 +103,18 @@
 </div>
 
 <a href="#cart" class="cart-bar" id="cart-bar" hidden><span id="cart-bar-count"></span><strong id="cart-bar-total"></strong></a>
+
+<dialog id="opt-dialog" aria-labelledby="opt-title">
+  <form method="dialog" id="opt-form">
+    <h2 id="opt-title"></h2>
+    <div id="opt-groups"></div>
+    <p class="notice error" id="opt-error" role="alert" hidden></p>
+    <div class="opt-actions">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn" value="add">Add to order · <span id="opt-price"></span></button>
+    </div>
+  </form>
+</dialog>
 
 <script type="application/json" id="menu-data">{{ menu_data | tojson }}</script>
 {% if reorder %}<script type="application/json" id="reorder-data">{{ reorder | tojson }}</script>{% endif %}

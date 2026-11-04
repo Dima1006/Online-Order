@@ -105,8 +105,21 @@ def venue_context(request, conn, venue, form=None, reorder=None):
     options = orders.arrival_options(venue) if ok else []
     if ok and not options:
         why = f"Too late to order for today. Opening hours: {orders.hours_text(venue)}."
-    menu_data = {str(v["id"]): {"name": i["name"], "label": v["label"], "price": v["price"]}
-                 for c in menu for i in c["items"] if i["is_available"] for v in i["variants"]}
+    from .web_options import load_groups  # local import: web_options itself imports this module
+    groups = {g["id"]: g for g in load_groups(conn, venue["id"]) if g["options"]}
+    item_groups = {}
+    for g in groups.values():
+        for item_id in g["item_ids"]:
+            item_groups.setdefault(item_id, []).append(g["id"])
+    for c in menu:
+        for i in c["items"]:
+            i["group_ids"] = item_groups.get(i["id"], [])
+    menu_data = {
+        "v": {str(v["id"]): {"name": i["name"], "label": v["label"], "price": v["price"], "g": i["group_ids"]}
+              for c in menu for i in c["items"] if i["is_available"] for v in i["variants"]},
+        "g": {str(g["id"]): {"name": g["name"], "required": bool(g["required"]), "multi": bool(g["multi"]),
+                             "options": [{"id": o["id"], "name": o["name"], "price": o["price"]} for o in g["options"]]}
+              for g in groups.values()}}
     user = current_user(request)
     minutes = [m for m, _ in options]
     wanted = (form or {}).get("arrival")

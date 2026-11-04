@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "_macros.html" import size_rows %}
+{% from "_macros.html" import size_rows, group_checks %}
 {% block title %}Menu · {{ venue.name }}{% endblock %}
 {% block nav %}{% include "_panel_nav.html" %}{% endblock %}
 {% block content %}
 <h1>Menu</h1>
+<p class="muted">Milk, syrup and other extras are set up in <a href="/panel/options">Add-ons</a>.</p>
 {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
 
 {% if not menu %}
@@ -48,7 +49,15 @@
             <label>Name <input name="name" value="{{ item.name }}" required maxlength="80"></label>
             <label>Description <span class="muted">(optional)</span> <input name="description" value="{{ item.description }}" maxlength="200"></label>
             {{ size_rows(item.variants) }}
+            {{ group_checks(groups, item.id) }}
             <button class="btn">Save changes</button>
+          </form>
+          <form method="post" action="/panel/photo/item/{{ item.id }}" enctype="multipart/form-data" class="photo-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64">{% endif %}
+            <label>Photo <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"></label>
+            <button class="btn ghost">{{ 'Replace photo' if item.image else 'Upload photo' }}</button>
+            {% if item.image %}<button class="linklike danger-text" name="remove" value="1">Remove photo</button>{% endif %}
           </form>
           <div class="actions">
             <form method="post" action="/panel/menu/item/{{ item.id }}/toggle" class="inline">
@@ -72,6 +81,8 @@
       <label>Name <input name="name" required maxlength="80" placeholder="e.g. Latte"></label>
       <label>Description <span class="muted">(optional)</span> <input name="description" maxlength="200"></label>
       {{ size_rows([]) }}
+      {{ group_checks(groups, 0) }}
+      <p class="muted small">You can add a photo after saving the item.</p>
       <button class="btn">Add item</button>
     </form>
   </details>

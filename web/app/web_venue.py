@@ -17,6 +17,8 @@ from .orders import hhmm, utcnow
 from .security import client_ip, limiter, ws_origin_ok
 from .utils import (clean, dummy_hash, name_problem, normalize, parse_hhmm, parse_variants, password_problem,
                     safe_next, session_fingerprint, slugify, valid_email)
+from . import media
+from .web_options import load_groups, save_item_groups
 from .web_public import invalidate_index, load_menu
 
 TOO_MANY = "Too many attempts. Please wait a few minutes and try again."
@@ -273,7 +275,8 @@ async def ws_panel(ws: WebSocket):
 @route
 async def panel_menu(request, conn):
     venue = require_venue(request)
-    return render(request, "panel_menu.html", venue=venue, menu=load_menu(conn, venue["id"]))
+    return render(request, "panel_menu.html", venue=venue, menu=load_menu(conn, venue["id"]),
+                  groups=load_groups(conn, venue["id"]))
 
 
 @route
@@ -297,8 +300,13 @@ async def add_category(request, conn):
 async def delete_category(request, conn):
     await read_form(request)
     venue = require_venue(request)
+    photos = [r["image"] for r in conn.execute(
+        "SELECT i.image FROM items i JOIN categories c ON c.id = i.category_id WHERE c.id = ? AND c.venue_id = ?",
+        (request.path_params["category_id"], venue["id"]))]
     with conn:
         conn.execute("DELETE FROM categories WHERE id = ? AND venue_id = ?", (request.path_params["category_id"], venue["id"]))
+    for name in photos:
+        media.delete_image(name)
     invalidate_index()
     return go(request, "/panel/menu")
 
@@ -351,6 +359,7 @@ async def add_item(request, conn):
         item_id = conn.execute("INSERT INTO items (venue_id, category_id, name, description) VALUES (?, ?, ?, ?)",
                                (venue["id"], category_id, name, clean(str(form.get("description", "")), 200))).lastrowid
         _save_variants(conn, item_id, parsed)
+        save_item_groups(conn, venue["id"], item_id, form)
     invalidate_index()
     return go(request, anchor)
 
@@ -377,6 +386,7 @@ async def update_item(request, conn):
         conn.execute("UPDATE items SET name = ?, description = ? WHERE id = ?",
                      (name, clean(str(form.get("description", "")), 200), item_id))
         _save_variants(conn, item_id, parsed)
+        save_item_groups(conn, venue["id"], item_id, form)
     invalidate_index()
     return go(request, anchor)
 
@@ -396,8 +406,11 @@ async def toggle_item(request, conn):
 async def delete_item(request, conn):
     await read_form(request)
     venue = require_venue(request)
+    row = conn.execute("SELECT image FROM items WHERE id = ? AND venue_id = ?", (request.path_params["item_id"], venue["id"])).fetchone()
     with conn:
         conn.execute("DELETE FROM items WHERE id = ? AND venue_id = ?", (request.path_params["item_id"], venue["id"]))
+    if row:
+        media.delete_image(row["image"])
     invalidate_index()
     return go(request, "/panel/menu")
 

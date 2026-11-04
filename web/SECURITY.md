@@ -35,3 +35,8 @@ Checked by `tests/test_smoke.py` (CSRF, login required, venue isolation, WebSock
 - Venue password change/reset (reset links are never written to the log unless MAIL_LOG_BODY=1).
 - Static files are served with content hashes and long caching; strict CSP, no third-party fonts or scripts.
 - Known gaps: no CAPTCHA yet, in-memory limiter works for a single process only, Telegram and Google login have not been tested against the real services.
+
+## Update: add-ons and photos
+- Add-on choices are validated on the server against the database: options must belong to groups attached to that item, required groups need a choice, single-choice groups allow one. The price is always recomputed on the server.
+- Photos: type decided by decoding (JPG/PNG/WebP only), at most 6 MB and 25 megapixels, always re-encoded to JPEG (removes GPS/metadata and hidden payloads), random file names, strict name check when serving, upload CSRF check, 30 uploads per venue per hour, only two images processed at once. Only photo upload routes may exceed the normal 100 KB request limit.
+- Uploaded files live next to the database (`data/uploads`): back them up and keep them on the persistent disk.

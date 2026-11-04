@@ -118,8 +118,10 @@ class SecurityMiddleware:
                 if not limiter.allow(f"{name}:{ip}", limit, window):
                     return await PlainTextResponse("Too many requests. Please slow down.", status_code=429,
                                                    headers={"Retry-After": "30"})(scope, receive, send)
+        # Photo uploads are the only requests allowed to be big (they are shrunk and re-encoded on the server).
+        body_limit = cfg.MAX_UPLOAD_BYTES + 50_000 if (method == "POST" and path.startswith("/panel/photo/")) else cfg.MAX_BODY_BYTES
         length = conn.headers.get("content-length", "")
-        if length.isdigit() and int(length) > cfg.MAX_BODY_BYTES:
+        if length.isdigit() and int(length) > body_limit:
             return await PlainTextResponse("Request too large", status_code=413)(scope, receive, send)
         host = conn.headers.get("host", "")
         # Safari needs the websocket host spelled out; 'self' alone does not cover ws:// there.
@@ -134,7 +136,7 @@ class SecurityMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > cfg.MAX_BODY_BYTES:
+                if received > body_limit:
                     raise _BodyTooLarge
             return message
 

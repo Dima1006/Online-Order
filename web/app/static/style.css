@@ -260,3 +260,25 @@ summary::-webkit-details-marker { display: none; }
 .how { max-width: 60ch; padding-left: 20px; }
 .how li { margin: 8px 0; }
 .history li > a.small { justify-self: end; }
+
+/* ---- photos */
+.thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex: none; }
+.vthumb { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; float: right; margin-left: 12px; }
+.cover { display: block; width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; margin-bottom: 12px; }
+.photo-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.photo-form label { display: flex; gap: 8px; align-items: center; margin: 0; }
+.irow .thumb { margin-right: 12px; }
+
+/* ---- add-ons */
+.addons { border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px 12px; }
+.addons legend { padding: 0 6px; font-weight: 600; }
+.addons .check { display: inline-flex; margin-right: 16px; }
+#opt-dialog { border: 0; border-radius: 14px; padding: 20px; width: min(440px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); }
+#opt-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+#opt-dialog fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+#opt-dialog legend { font-weight: 700; margin-bottom: 6px; }
+.opt { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; }
+.opt input { width: auto; margin: 0; }
+.opt span { flex: 1; }
+.opt em { font-style: normal; color: var(--muted); }
+.opt-actions { display: flex; gap: 12px; justify-content: flex-end; }

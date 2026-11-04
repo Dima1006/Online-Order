@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Add-ons · {{ venue.name }}{% endblock %}
+{% block nav %}{% include "_panel_nav.html" %}{% endblock %}
+{% block content %}
+<h1>Add-ons</h1>
+<p class="lead">Extras customers can choose for a drink or dish: milk, syrup, an extra shot. Create a group here, then tick it for the items in the <a href="/panel/menu">Menu</a>.</p>
+
+{% macro group_form(action, g) %}
+<form method="post" action="{{ action }}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Group name <input name="name" value="{{ g.name if g else '' }}" required maxlength="40" placeholder="e.g. Milk"></label>
+  <label class="check"><input type="checkbox" name="required" {{ 'checked' if g and g.required else '' }}> The customer must choose one (for example the milk type)</label>
+  <label class="check"><input type="checkbox" name="multi" {{ 'checked' if g and g.multi else '' }}> The customer may choose several (for example syrups)</label>
+  <label>Options <span class="muted">(one per line, extra price after +)</span>
+    <textarea name="options" rows="5" required placeholder="Regular milk&#10;Oat milk +2.00&#10;Soy milk +1.50">{% if g %}{% for o in g.options %}{{ o.name }}{% if o.price %} +{{ '%d.%02d' % (o.price // 100, o.price % 100) }}{% endif %}
+{% endfor %}{% endif %}</textarea>
+  </label>
+  <button class="btn">{{ 'Save changes' if g else 'Add group' }}</button>
+</form>
+{% endmacro %}
+
+{% if not groups %}
+<section class="starter">
+  <h2>No add-ons yet</h2>
+  <p>Example: a group “Milk” with the options <em>Regular milk</em>, <em>Oat milk +2.00</em>, <em>Soy milk +1.50</em>. Tick “must choose one”, then attach it to your lattes and cappuccinos.</p>
+</section>
+{% endif %}
+
+<ul class="mitems">
+  {% for g in groups %}
+  <li>
+    <details>
+      <summary>
+        <span class="mname">{{ g.name }}</span>
+        <span class="muted mprices">{% for o in g.options %}{{ o.name }}{% if o.price %} +{{ o.price | zl }}{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</span>
+        <span class="badge">{{ 'must choose' if g.required else 'optional' }}{{ ', several' if g.multi else '' }}</span>
+        <span class="edit-hint">Edit</span>
+      </summary>
+      <div class="editor">
+        {{ group_form("/panel/options/group/" ~ g.id, g) }}
+        <p class="muted small">Used by {{ g.item_ids | length }} item{{ '' if g.item_ids | length == 1 else 's' }}.</p>
+        <form method="post" action="/panel/options/group/{{ g.id }}/delete" class="inline" data-confirm="Delete this group? It disappears from all items.">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn ghost danger-text">Delete group</button></form>
+      </div>
+    </details>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if groups | length < max_groups %}
+<details class="add-item" {{ 'open' if not groups else '' }}>
+  <summary class="btn">+ New add-on group</summary>
+  <div class="editor">{{ group_form("/panel/options/group", none) }}</div>
+</details>
+{% endif %}
+{% endblock %}

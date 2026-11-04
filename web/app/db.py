@@ -7,7 +7,7 @@ from . import config as cfg
 from .utils import normalize
 
 DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent / "data" / "app.db"))
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS venues (
     prep_minutes INTEGER NOT NULL DEFAULT 5,  -- earliest arrival a customer can choose
     max_active INTEGER NOT NULL DEFAULT 15,   -- the venue stops taking orders above this many active ones
     paused_until TEXT,                        -- UTC; short "we are swamped" pause
+    image TEXT NOT NULL DEFAULT '',           -- file name in the uploads folder ('' = no photo)
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -52,7 +53,29 @@ CREATE TABLE IF NOT EXISTS items (
     category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
-    is_available INTEGER NOT NULL DEFAULT 1
+    is_available INTEGER NOT NULL DEFAULT 1,
+    image TEXT NOT NULL DEFAULT ''
+);
+
+-- Add-ons ("Milk", "Syrup", "Extra shot"): a group of options with a price each, attached to items.
+-- required: the customer must pick something; multi: several options may be picked.
+CREATE TABLE IF NOT EXISTS option_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    venue_id INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    required INTEGER NOT NULL DEFAULT 0,
+    multi INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL REFERENCES option_groups(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL DEFAULT 0          -- extra grosze, 0 = free
+);
+CREATE TABLE IF NOT EXISTS item_option_groups (
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL REFERENCES option_groups(id) ON DELETE CASCADE,
+    PRIMARY KEY (item_id, group_id)
 );
 
 -- One row per size/option. Price is stored in grosze (1 zł = 100).
@@ -94,8 +117,10 @@ CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    variant_label TEXT NOT NULL DEFAULT '',
-    price INTEGER NOT NULL,
+    variant_label TEXT NOT NULL DEFAULT '',   -- what is shown: size and add-ons, e.g. "Large, Oat milk"
+    size_label TEXT NOT NULL DEFAULT '',      -- the size alone (used to match the item again for "Order again")
+    option_ids TEXT NOT NULL DEFAULT '',      -- chosen add-on ids, "3,7"
+    price INTEGER NOT NULL,                   -- per piece, add-ons included
     qty INTEGER NOT NULL
 );
 

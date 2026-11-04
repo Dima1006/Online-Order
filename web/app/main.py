@@ -11,7 +11,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
 from . import config as cfg
-from . import db, events, orders, telegram, web_account, web_admin, web_public, web_venue
+from . import db, events, media, orders, telegram, web_account, web_admin, web_options, web_public, web_venue
 from .core import BASE_DIR, Redirect, http_error, redirect_handler, render, route, server_error
 from .security import SecurityMiddleware
 from .seed import seed_demo
@@ -110,6 +110,13 @@ routes = [
     Route("/panel/menu/item/{item_id:int}", web_venue.update_item, methods=P),
     Route("/panel/menu/item/{item_id:int}/toggle", web_venue.toggle_item, methods=P),
     Route("/panel/menu/item/{item_id:int}/delete", web_venue.delete_item, methods=P),
+    Route("/panel/options", web_options.panel_options),
+    Route("/panel/options/group", web_options.add_group, methods=P),
+    Route("/panel/options/group/{group_id:int}", web_options.update_group, methods=P),
+    Route("/panel/options/group/{group_id:int}/delete", web_options.delete_group, methods=P),
+    Route("/panel/photo/item/{item_id:int}", web_options.item_photo, methods=P),
+    Route("/panel/photo/venue", web_options.venue_photo, methods=P),
+    Route("/media/{name}", media.media),
     Route("/panel/settings", web_venue.panel_settings),
     Route("/panel/settings/save", web_venue.save_settings, methods=P),
     Route("/panel/password", web_venue.panel_password, methods=P),

@@ -14,7 +14,16 @@
   <label>Street address <input name="address" value="{{ venue.address }}" maxlength="120"></label>
   <label>Short description <textarea name="description" rows="3" maxlength="300">{{ venue.description }}</textarea></label>
 
-  <h2 class="gap">Taking orders</h2>
+  <h2 class="gap">Photo</h2>
+<form method="post" action="/panel/photo/venue" enctype="multipart/form-data" class="stack narrow">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if venue.image %}<img class="cover" src="/media/{{ venue.image }}" alt="" width="1400" height="700">{% endif %}
+  <label>Venue photo <span class="muted">(JPG, PNG or WebP; shown on your page and in search)</span> <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"></label>
+  <div class="row-form"><button class="btn ghost">{{ 'Replace photo' if venue.image else 'Upload photo' }}</button>
+  {% if venue.image %}<button class="linklike danger-text" name="remove" value="1">Remove photo</button>{% endif %}</div>
+</form>
+
+<h2 class="gap">Taking orders</h2>
   <label class="check"><input type="checkbox" name="accepting_orders" {{ 'checked' if venue.accepting_orders else '' }}> Accepting orders</label>
   <div class="pair">
     <label>Opens <input type="time" name="open_time" value="{{ venue.open_time }}" required></label>

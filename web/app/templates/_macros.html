@@ -12,3 +12,13 @@
   <button type="button" class="btn ghost add-size">+ Add another size</button>
 </div>
 {% endmacro %}
+
+
+{# Which add-on groups (milk, syrup...) an item offers. #}
+{% macro group_checks(groups, item_id) %}
+{% if groups %}
+<fieldset class="addons"><legend>Add-ons offered with this item</legend>
+  {% for g in groups %}<label class="check"><input type="checkbox" name="group_id" value="{{ g.id }}" {{ 'checked' if item_id and item_id in g.item_ids else '' }}> {{ g.name }}</label>{% endfor %}
+</fieldset>
+{% else %}<p class="muted small">Want milk or syrup choices? Create them first in <a href="/panel/options">Add-ons</a>.</p>{% endif %}
+{% endmacro %}

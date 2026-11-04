@@ -3,6 +3,7 @@
   {% for v in venues %}
   <li>
     <a href="/v/{{ v.slug }}">
+      {% if v.image %}<img class="vthumb" src="/media/{{ v.image }}" alt="" width="72" height="72" loading="lazy">{% endif %}
       <span class="vname">{{ v.name }}</span>
       <span class="vmeta">{{ [v.address, v.city] | select | join(", ") or "Address not set" }}</span>
       {% if v.matched %}<span class="vmatch">{{ v.matched | join(", ") }}</span>{% endif %}

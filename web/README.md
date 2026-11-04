@@ -38,3 +38,6 @@ See `SECURITY.md` for the security review.
 
 ## Stage 2 update
 New: opening hours, preparation time, pause and capacity limits per venue; no-show grace period and per-venue blocking; order cancel by customer; automatic expiry of stale orders; venue password reset and change; navigation menu and category chips; protection against floods. Run tests: `cd web && python3 -I tests/test_smoke.py`. Run the server with ONE process (`--ws-max-size 1024`). See `docs/ROADMAP.md` for what is next.
+
+## Add-ons and photos
+Panel → **Add-ons**: create groups (Milk, Syrup...) with options and extra prices, then tick them for items in **Menu**. Photos: item editor (Menu) and venue photo (Settings). Uploads are stored in `data/uploads` next to the database. Needs `Pillow` (in `requirements.txt`). Tests: `python3 -I tests/test_smoke.py` and `python3 -I tests/test_features.py`.

@@ -53,6 +53,11 @@ MAX_ACTIVE_PER_USER_VENUE = 2    # ... and at one venue
 MAX_ORDER_TOTAL = 100_000        # grosze = 1000 zł per order
 MAX_CART_LINES = 30
 MAX_CATEGORIES = 30              # per venue
+MAX_OPTION_GROUPS = 20           # per venue
+MAX_OPTIONS_PER_GROUP = 20
+MAX_UPLOAD_BYTES = 6_000_000     # a photo may be this big before it is shrunk
+MAX_IMAGE_PIXELS = 25_000_000    # decompression-bomb guard
+UPLOADS_PER_HOUR = 30            # photo uploads per venue per hour
 MAX_ITEMS = 300                  # per venue
 VENUE_ORDERS_PER_HOUR = 120      # stops a flood of fake orders at one venue
 

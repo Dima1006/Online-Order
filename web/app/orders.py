@@ -167,29 +167,45 @@ def create_order(conn, venue, user, arrival_minutes: int, note: str, cart_json: 
     if last_hour >= cfg.VENUE_ORDERS_PER_HOUR:
         return None, "This venue received too many orders in the last hour. Please try again later."
 
-    wanted: dict[int, int] = {}
+    wanted: dict[tuple, int] = {}   # (variant id, sorted add-on ids) -> quantity
     try:
         lines = json.loads(cart_json)
         if not isinstance(lines, list):
             raise ValueError
         for line in lines[:cfg.MAX_CART_LINES + 1]:
             vid, qty = int(line["variant_id"]), int(line["qty"])
+            raw = line.get("options") or []
+            if not isinstance(raw, list) or len(raw) > 20:
+                raise ValueError
+            key = (vid, tuple(sorted({int(x) for x in raw})))
             if 1 <= qty <= 20:
-                wanted[vid] = min(20, wanted.get(vid, 0) + qty)
-    except (ValueError, TypeError, KeyError):
+                wanted[key] = min(20, wanted.get(key, 0) + qty)
+    except (ValueError, TypeError, KeyError, AttributeError):
         return None, "Your cart could not be read. Please try again."
     if not wanted:
         return None, "Your cart is empty."
     if len(wanted) > cfg.MAX_CART_LINES:
         return None, f"An order can have at most {cfg.MAX_CART_LINES} different items."
-    rows = conn.execute(
-        f"""SELECT v.id, v.label, v.price, i.name, i.is_available
+    vids = sorted({k[0] for k in wanted})
+    rows = {r["id"]: r for r in conn.execute(
+        f"""SELECT v.id, v.label, v.price, i.id AS item_id, i.name, i.is_available
             FROM variants v JOIN items i ON i.id = v.item_id
-            WHERE i.venue_id = ? AND v.id IN ({','.join('?' * len(wanted))})""",
-        (venue["id"], *wanted)).fetchall()
-    if len(rows) != len(wanted) or not all(r["is_available"] for r in rows):
-        return None, "Some items in your cart are no longer available or their prices changed. Please review your order."
-    total = sum(r["price"] * wanted[r["id"]] for r in rows)
+            WHERE i.venue_id = ? AND v.id IN ({','.join('?' * len(vids))})""",
+        (venue["id"], *vids))}
+    stale = "Some items in your cart are no longer available or their prices changed. Please review your order."
+    lines_to_save, total = [], 0
+    for (vid, oids), qty in wanted.items():
+        r = rows.get(vid)
+        if not r or not r["is_available"]:
+            return None, stale
+        checked = check_options(conn, venue["id"], r["item_id"], oids)
+        if checked is None:
+            return None, "Some choices (milk, syrup...) are missing or no longer available. Please review your order."
+        names, extra = checked
+        unit = r["price"] + extra
+        total += unit * qty
+        shown = ", ".join([x for x in [r["label"], *names] if x])
+        lines_to_save.append((r["name"], shown, r["label"], ",".join(map(str, oids)), unit, qty))
     if total > cfg.MAX_ORDER_TOTAL:
         return None, f"An order can be at most {format_zl(cfg.MAX_ORDER_TOTAL)}. Please split it or call the venue."
     try:
@@ -201,8 +217,9 @@ def create_order(conn, venue, user, arrival_minutes: int, note: str, cart_json: 
                  (now + timedelta(minutes=arrival_minutes)).strftime(UTC_FMT), note, total,
                  submit_key or None)).lastrowid
             conn.executemany(
-                "INSERT INTO order_items (order_id, name, variant_label, price, qty) VALUES (?, ?, ?, ?, ?)",
-                [(order_id, r["name"], r["label"], r["price"], wanted[r["id"]]) for r in rows])
+                "INSERT INTO order_items (order_id, name, variant_label, size_label, option_ids, price, qty) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(order_id, *line) for line in lines_to_save])
     except sqlite3.IntegrityError:  # lost a race on submit_key
         existing = conn.execute("SELECT id FROM orders WHERE submit_key = ?", (submit_key,)).fetchone()
         if existing:
@@ -211,18 +228,47 @@ def create_order(conn, venue, user, arrival_minutes: int, note: str, cart_json: 
     return order_id, None
 
 
-def reorder_cart(conn, venue_id: int, user_id: int, order_id: int) -> dict[int, int]:
-    """Match the items of an old order to the venue's current menu: {variant_id: qty}. Missing items are skipped."""
-    old = conn.execute("SELECT oi.name, oi.variant_label, oi.qty FROM order_items oi JOIN orders o ON o.id = oi.order_id "
+def check_options(conn, venue_id: int, item_id: int, option_ids: tuple):
+    """Are these add-on ids a valid choice for this item? Returns ([names], extra grosze) or None.
+    The rules come from the database: options must belong to groups attached to the item, a required
+    group needs a choice, and a single-choice group allows only one."""
+    groups = conn.execute(
+        "SELECT g.* FROM option_groups g JOIN item_option_groups ig ON ig.group_id = g.id "
+        "WHERE ig.item_id = ? AND g.venue_id = ? ORDER BY g.id", (item_id, venue_id)).fetchall()
+    chosen = []
+    if option_ids:
+        chosen = conn.execute(
+            f"SELECT id, name, price, group_id FROM options WHERE id IN ({','.join('?' * len(option_ids))}) ORDER BY group_id, id",
+            option_ids).fetchall()
+        if len(chosen) != len(option_ids):
+            return None
+    allowed = {g["id"] for g in groups}
+    if any(o["group_id"] not in allowed for o in chosen):
+        return None
+    for g in groups:
+        n = sum(1 for o in chosen if o["group_id"] == g["id"])
+        if (g["required"] and n == 0) or (not g["multi"] and n > 1):
+            return None
+    return [o["name"] for o in chosen], sum(o["price"] for o in chosen)
+
+
+def reorder_cart(conn, venue_id: int, user_id: int, order_id: int) -> list[dict]:
+    """Match the lines of an old order to the venue's current menu: [{"v": variant id, "o": [add-on ids], "q": qty}].
+    Items or add-ons that are gone are skipped."""
+    old = conn.execute("SELECT oi.name, oi.size_label, oi.option_ids, oi.qty FROM order_items oi JOIN orders o ON o.id = oi.order_id "
                        "WHERE o.id = ? AND o.user_id = ? AND o.venue_id = ?", (order_id, user_id, venue_id)).fetchall()
-    cart = {}
+    cart = []
     for it in old:
         row = conn.execute(
-            "SELECT v.id FROM variants v JOIN items i ON i.id = v.item_id "
+            "SELECT v.id, i.id AS item_id FROM variants v JOIN items i ON i.id = v.item_id "
             "WHERE i.venue_id = ? AND i.is_available = 1 AND i.name = ? AND v.label = ?",
-            (venue_id, it["name"], it["variant_label"])).fetchone()
-        if row:
-            cart[row["id"]] = it["qty"]
+            (venue_id, it["name"], it["size_label"])).fetchone()
+        if not row:
+            continue
+        oids = tuple(int(x) for x in it["option_ids"].split(",") if x.isdigit())
+        if check_options(conn, venue_id, row["item_id"], oids) is None:
+            continue
+        cart.append({"v": row["id"], "o": list(oids), "q": it["qty"]})
     return cart
 
 
