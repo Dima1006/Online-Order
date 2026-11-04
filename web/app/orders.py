@@ -390,7 +390,7 @@ def live_orders(conn, venue_id: int):
 
 def user_orders(conn, user_id: int, limit: int = 50):
     rows = conn.execute(
-        "SELECT o.*, v.name AS venue_name, v.slug AS venue_slug FROM orders o "
+        "SELECT o.*, v.name AS venue_name, v.slug AS venue_slug, v.image AS venue_image FROM orders o "
         "JOIN venues v ON v.id = o.venue_id WHERE o.user_id = ? ORDER BY o.id DESC LIMIT ?",
         (user_id, limit)).fetchall()
     return hydrate(conn, rows)

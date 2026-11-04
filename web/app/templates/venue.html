@@ -1,14 +1,22 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}{{ venue.name }} · {{ APP_NAME }}{% endblock %}
 {% block body_attrs %}data-slug="{{ venue.slug }}" data-open="{{ 1 if can_order else 0 }}"{% endblock %}
 {% block content %}
 <p class="crumb"><a href="/">‹ All venues</a></p>
-{% if venue.image %}<img class="cover" src="/media/{{ venue.image }}" alt="" width="1400" height="700">{% endif %}
-<div class="venue-head">
-  <h1>{{ venue.name }}</h1>
-  <p class="muted">{{ [venue.address, venue.city] | select | join(", ") }}{% if venue.status == "approved" %} · Hours: {{ hours }}{% endif %}</p>
-  {% if venue.description %}<p>{{ venue.description }}</p>{% endif %}
-</div>
+<header class="vhead">
+  {{ avatar(venue.name, venue.image, "xl") }}
+  <div class="vinfo">
+    <h1>{{ venue.name }}</h1>
+    <dl class="facts">
+      {% set where = [venue.address, venue.city] | select | join(", ") %}
+      {% if where %}<div><dt>Address</dt><dd>{{ where }}</dd></div>{% endif %}
+      {% if venue.status == "approved" %}<div><dt>Hours</dt><dd>{{ hours }}</dd></div>{% endif %}
+      <div><dt>Pay</dt><dd>At the venue, when you pick up</dd></div>
+    </dl>
+    {% if venue.description %}<p class="vdesc">{{ venue.description }}</p>{% endif %}
+  </div>
+</header>
 
 {% if venue.status != "approved" %}<div class="notice">Preview: this page is not public yet{% if venue.status == "pending" %}, it is waiting for approval{% endif %}. Ordering is disabled.</div>
 {% elif not can_order %}<div class="notice">{{ closed_reason }} You can still look at the menu.</div>{% endif %}
@@ -73,7 +81,14 @@
     <p class="cart-total"><span>Total</span><strong id="cart-total">0,00 zł</strong></p>
 
     {% if me %}
-    <p class="who">Ordering as <strong>{{ me.name }}</strong>{% if me.phone %} · {{ me.phone }}{% endif %} <a href="/account">change</a></p>
+    <div class="pickup">
+      <div class="pickup-text">
+        <span class="muted small">Pick-up name and phone</span>
+        <strong>{{ me.name }}</strong>
+        <span class="muted">{{ me.phone or "No phone number" }}</span>
+      </div>
+      <a class="btn ghost small" href="/account">Edit</a>
+    </div>
     {% if needs_verification %}<div class="notice">Confirm your email address first: we sent you a link. You can resend it in <a href="/account">My account</a>.</div>{% endif %}
     <form method="post" action="/v/{{ venue.slug }}/order" id="order-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">

@@ -41,3 +41,6 @@ New: opening hours, preparation time, pause and capacity limits per venue; no-sh
 
 ## Add-ons and photos
 Panel → **Add-ons**: create groups (Milk, Syrup...) with options and extra prices, then tick them for items in **Menu**. Photos: item editor (Menu) and venue photo (Settings). Uploads are stored in `data/uploads` next to the database. Needs `Pillow` (in `requirements.txt`). Tests: `python3 -I tests/test_smoke.py` and `python3 -I tests/test_features.py`.
+
+## E-mail (password reset, confirmation, sign-in code)
+All of it needs the `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` (and `ADMIN_EMAIL`) secrets. For Gmail: host `smtp.gmail.com`, your address, and an **App Password**. After adding them open `/admin` and press **Send a test email**: it shows the exact error if something is wrong. Tests: `python3 -I tests/test_auth.py`.

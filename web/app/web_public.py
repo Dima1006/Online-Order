@@ -128,7 +128,7 @@ def venue_context(request, conn, venue, form=None, reorder=None):
                 can_order=ok and bool(options), closed_reason=why, arrival_options=options,
                 default_arrival=default_arrival, submit_key=secrets.token_urlsafe(16),
                 hours=orders.hours_text(venue), reorder=reorder,
-                needs_verification=bool(user and not user["email_verified"] and not cfg.DEMO_MODE))
+                needs_verification=bool(user and not user["email_verified"] and cfg.VERIFY_REQUIRED))
 
 
 @route
@@ -163,7 +163,7 @@ async def place_order(request, conn):
         request.session["flash"] = [["error", message]]
         return render(request, "venue.html", 400, **ctx)
 
-    if not user["email_verified"] and not cfg.DEMO_MODE:
+    if not user["email_verified"] and cfg.VERIFY_REQUIRED:
         return fail("Please confirm your email address first (we sent you a link). You can resend it in My account.")
     order_id, error = orders.create_order(conn, venue, user, arrival, note, str(form.get("cart", "[]")),
                                           str(form.get("submit_key", "")))

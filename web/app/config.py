@@ -43,6 +43,12 @@ TELEGRAM_BOT_USERNAME = ""  # filled in at startup from getMe
 
 # Print the body of e-mails (password-reset links!) to the log when SMTP is not set up. Local development only.
 MAIL_LOG_BODY = env_bool("MAIL_LOG_BODY")
+MAIL_ENABLED = bool(SMTP_HOST)
+# With working e-mail, customers must confirm their address before ordering (otherwise nobody could be reached).
+VERIFY_REQUIRED = MAIL_ENABLED
+CODE_TTL_MIN = 10                # a sign-in code from e-mail works this long
+CODE_MAX_TRIES = 5               # wrong guesses before the code is thrown away
+CONTACT_PER_HOUR = 3             # contact-form messages per IP per hour
 
 # ---- ordering rules
 MAX_NO_SHOWS = 2                 # a customer is blocked at a venue after this many no-shows there

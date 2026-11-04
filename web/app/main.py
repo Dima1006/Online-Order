@@ -11,7 +11,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
 from . import config as cfg
-from . import db, events, media, orders, telegram, web_account, web_admin, web_options, web_public, web_venue
+from . import db, events, media, orders, telegram, web_account, web_admin, web_contact, web_options, web_public, web_venue
 from .core import BASE_DIR, Redirect, http_error, redirect_handler, render, route, server_error
 from .security import SecurityMiddleware
 from .seed import seed_demo
@@ -79,6 +79,9 @@ routes = [
     Route("/verify/{token}", web_account.verify_email),
     Route("/resend-verification", web_account.resend_verification, methods=P),
     Route("/forgot", web_account.forgot, methods=GP),
+    Route("/login/code", web_account.login_code, methods=GP),
+    Route("/login/code/verify", web_account.login_code_verify, methods=GP),
+    Route("/contact", web_contact.contact, methods=GP),
     Route("/reset/{token}", web_account.reset_password, methods=GP),
     Route("/auth/google", web_account.google_start),
     Route("/auth/google/callback", web_account.google_callback),
@@ -126,6 +129,7 @@ routes = [
     # admin
     Route("/admin/login", web_admin.admin_login, methods=GP),
     Route("/admin", web_admin.admin_home),
+    Route("/admin/test-mail", web_admin.admin_test_mail, methods=P),
     Route("/admin/venues/{venue_id:int}/{action}", web_admin.admin_venue_action, methods=P),
     Route("/admin/flags/{venue_id:int}/{user_id:int}/unblock", web_admin.admin_unblock_user, methods=P),
     Mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static"),

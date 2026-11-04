@@ -1,7 +1,9 @@
 """Customer accounts: sign up, log in (password or Google), verify e-mail, reset password, My account, My orders."""
 import hashlib
 import hmac
+import re
 import secrets
+from urllib.parse import urlencode
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from starlette.exceptions import HTTPException
@@ -57,6 +59,73 @@ async def login(request, conn):
     return go(request, nxt)
 
 
+# ---------------------------------------------------------------- sign in with a code sent by e-mail
+
+def _code_hash(email: str, code: str) -> str:
+    return hmac.new(cfg.SECRET_KEY.encode(), f"{email}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+@route
+async def login_code(request, conn):
+    """Step 1: ask for a 6-digit code. The answer is the same whether or not the account exists."""
+    nxt = safe_next(request.query_params.get("next") if request.method == "GET" else None)
+    if request.method == "GET":
+        return render(request, "login_code.html", next=nxt, email="")
+    form = await read_form(request)
+    nxt = safe_next(str(form.get("next", "")))
+    email = clean(str(form.get("email", "")), 254).lower()
+    _throttle(f"code-ip:{client_ip(request)}", 10, 3600)
+    _throttle(f"code-email:{email}", 3, 600)
+    if not cfg.MAIL_ENABLED:
+        return render(request, "login_code.html", 400, next=nxt, email=email,
+                      error="Sign-in by email is not available on this server yet. Please use your password.")
+    if not valid_email(email):
+        return render(request, "login_code.html", 400, next=nxt, email=email, error="Enter a valid email address.")
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if user:
+        code = f"{secrets.randbelow(10 ** 6):06d}"
+        with conn:
+            conn.execute("INSERT OR REPLACE INTO login_codes (email, code_hash, expires_at, tries) "
+                         "VALUES (?, ?, datetime('now', ?), 0)", (email, _code_hash(email, code), f"+{cfg.CODE_TTL_MIN} minutes"))
+        send_mail_bg(email, f"Your sign-in code: {code}",
+                     f"Hi {user['name']},\n\nYour sign-in code is {code}\n\n"
+                     f"It works for {cfg.CODE_TTL_MIN} minutes. If you did not ask for it, ignore this message: "
+                     "nobody can sign in without it.")
+    return go(request, "/login/code/verify?" + urlencode({"email": email, "next": nxt}))
+
+
+@route
+async def login_code_verify(request, conn):
+    """Step 2: check the code. Five wrong guesses throw the code away."""
+    if request.method == "GET":
+        return render(request, "login_code_verify.html", email=clean(request.query_params.get("email", ""), 254).lower(),
+                      next=safe_next(request.query_params.get("next")))
+    form = await read_form(request)
+    email = clean(str(form.get("email", "")), 254).lower()
+    nxt = safe_next(str(form.get("next", "")))
+    code = re.sub(r"\D", "", str(form.get("code", "")))[:6]
+    ip = client_ip(request)
+    _throttle(f"codev-ip:{ip}", 30, 600)
+    _throttle(f"codev-email:{email}", 15, 600)
+    row = conn.execute("SELECT * FROM login_codes WHERE email = ? AND expires_at > datetime('now')", (email,)).fetchone()
+    good = bool(row and row["tries"] < cfg.CODE_MAX_TRIES and len(code) == 6
+                and hmac.compare_digest(row["code_hash"], _code_hash(email, code)))
+    if good:
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        with conn:
+            conn.execute("DELETE FROM login_codes WHERE email = ?", (email,))
+            if user:   # the code proves control of the mailbox
+                conn.execute("UPDATE users SET email_verified = 1 WHERE id = ?", (user["id"],))
+        if user:
+            login_session(request, user=conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+            return go(request, nxt)
+    elif row:
+        with conn:
+            conn.execute("UPDATE login_codes SET tries = tries + 1 WHERE email = ?", (email,))
+    return render(request, "login_code_verify.html", 400, email=email, next=nxt,
+                  error="That code is wrong or has expired. Check the latest email, or request a new code.")
+
+
 def _send_verification(request, user) -> None:
     token = _signer("verify-email").dumps({"uid": user["id"], "email": user["email"]})
     send_mail_bg(user["email"], "Confirm your email",
@@ -100,7 +169,7 @@ async def signup(request, conn):
     _send_verification(request, user)
     login_session(request, user=user)
     msg = ("Account created. Check your inbox and confirm your email to place orders."
-           if not cfg.DEMO_MODE else "Account created.")
+           if cfg.VERIFY_REQUIRED else "Account created.")
     return go(request, nxt, msg=msg)
 
 

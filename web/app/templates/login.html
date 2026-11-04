@@ -15,7 +15,7 @@
     <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
     <button class="btn wide">Log in</button>
   </form>
-  <p class="muted"><a href="/forgot">Forgot password?</a></p>
+  <p class="muted"><a href="/forgot">Forgot password?</a> · <a href="/login/code?next={{ next | urlencode }}">Email me a sign-in code</a></p>
   <p class="muted">New here? <a href="/signup?next={{ next | urlencode }}">Create an account</a>. Own a venue? <a href="/venue/login">Venue login</a>.</p>
 </section>
 {% endblock %}

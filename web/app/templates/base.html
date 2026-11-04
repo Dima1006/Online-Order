@@ -17,7 +17,7 @@
     </form>
     {% endblock %}
     {% endif %}
-    <nav>
+    <nav{% if ven %} class="panelnav"{% endif %}>
       {% block nav %}
         {% if me %}
           <details class="pop">
@@ -50,9 +50,29 @@
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">
-    <a href="/">Find a venue</a>
-    <a href="/for-venues">For venues</a>
-    {% if not ven %}<a href="/venue/login">Venue login</a>{% endif %}
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="/">{{ APP_NAME }}</a>
+        <p class="muted small">Order ahead. Walk in, pick up.</p>
+      </div>
+      <nav aria-label="For customers">
+        <h3>Customers</h3>
+        <a href="/">Find a venue</a>
+        {% if me %}<a href="/my-orders">My orders</a><a href="/account">My account</a>
+        {% else %}<a href="/login">Log in</a><a href="/signup">Create an account</a>{% endif %}
+      </nav>
+      <nav aria-label="For venues">
+        <h3>For venues</h3>
+        <a href="/for-venues">How it works</a>
+        <a href="/venue/register">Register your venue</a>
+        {% if ven %}<a href="/panel">Venue panel</a>{% else %}<a href="/venue/login">Venue login</a>{% endif %}
+      </nav>
+      <nav aria-label="Company">
+        <h3>Contact</h3>
+        <a href="/contact">Write to us</a>
+      </nav>
+    </div>
+    <p class="foot-bottom small muted">© {{ APP_NAME }}. Pay at the venue when you pick up your order.</p>
   </footer>
   <script src="{{ static('app.js') }}"></script>
   {% block scripts %}{% endblock %}

@@ -42,4 +42,19 @@
   {% endfor %}
 </ul>
 {% else %}<p class="muted">None.</p>{% endif %}
+
+<h2 class="gap">Email</h2>
+<p>{% if mail_enabled %}Sending is <strong>on</strong>. Reset links, confirmations and sign-in codes are sent by email.{% else %}Sending is <strong>off</strong>: password reset and sign-in codes cannot work. Add the <code>SMTP_HOST</code>, <code>SMTP_USER</code> and <code>SMTP_PASSWORD</code> secrets.{% endif %}</p>
+<form method="post" action="/admin/test-mail" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn ghost">Send a test email{% if admin_email %} to {{ admin_email }}{% endif %}</button></form>
+
+<h2 class="gap">Messages from the contact form</h2>
+{% if messages %}
+<ul class="rows admin-rows">
+  {% for m in messages %}
+  <li><strong>{{ m.name }}</strong> <a href="mailto:{{ m.email }}">{{ m.email }}</a> <span class="muted">{{ m.created_at[:16] }}</span>
+    <p>{{ m.message }}</p></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">No messages yet.</p>{% endif %}
 {% endblock %}

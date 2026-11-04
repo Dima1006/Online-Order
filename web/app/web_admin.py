@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException
 
 from . import config as cfg
 from .core import go, login_session, read_form, render, require_admin, route
-from .mail import public_url, send_mail_bg
+from .mail import public_url, send_mail_bg, send_mail_checked
 from .security import client_ip, limiter
 from .web_public import invalidate_index
 
@@ -45,7 +45,25 @@ async def admin_home(request, conn):
         "SELECT f.*, u.name, u.email, v.name AS venue_name FROM venue_customer_flags f "
         "JOIN users u ON u.id = f.user_id JOIN venues v ON v.id = f.venue_id "
         "WHERE f.warnings > 0 ORDER BY f.blocked DESC, f.venue_id").fetchall()
-    return render(request, "admin.html", venues=venues, blocked=blocked)
+    messages = conn.execute("SELECT * FROM contact_messages ORDER BY id DESC LIMIT 30").fetchall()
+    return render(request, "admin.html", venues=venues, blocked=blocked, messages=messages,
+                  mail_enabled=cfg.MAIL_ENABLED, admin_email=cfg.ADMIN_EMAIL)
+
+
+@route
+async def admin_test_mail(request, conn):
+    """Sends a real e-mail to ADMIN_EMAIL and shows the exact result, so a wrong SMTP setting is visible at once."""
+    _enabled()
+    await read_form(request)
+    require_admin(request)
+    if not limiter.allow("admin-test-mail", 5, 600):
+        raise HTTPException(429, "Please wait a few minutes before sending another test.")
+    if not cfg.ADMIN_EMAIL:
+        return go(request, "/admin", error="Set the ADMIN_EMAIL secret first: the test mail is sent to it.")
+    problem = await send_mail_checked(cfg.ADMIN_EMAIL, "Test email", "If you can read this, sending email works.")
+    if problem:
+        return go(request, "/admin", error=f"Test email failed. {problem}")
+    return go(request, "/admin", msg=f"Test email sent to {cfg.ADMIN_EMAIL}. Check the inbox (and spam).")
 
 
 @route

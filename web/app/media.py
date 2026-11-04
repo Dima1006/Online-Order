@@ -21,7 +21,7 @@ from .db import DB_PATH
 Image.MAX_IMAGE_PIXELS = cfg.MAX_IMAGE_PIXELS
 UPLOAD_DIR = Path(DB_PATH).parent / "uploads"
 _NAME = re.compile(r"^[A-Za-z0-9_-]{16,40}\.jpg$")
-_SIZES = {"item": (800, 800), "venue": (1400, 700)}
+_SIZES = {"item": (640, 640), "venue": (640, 640)}   # both are square: shown as circles or square crops
 _slots = threading.BoundedSemaphore(2)   # at most two images are processed at the same time
 
 
@@ -47,7 +47,7 @@ def _process(data: bytes, kind: str) -> bytes:
                 img = bg
             else:
                 img = img.convert("RGB")
-            img.thumbnail(_SIZES[kind], Image.LANCZOS)
+            img = ImageOps.fit(img, _SIZES[kind], Image.LANCZOS)   # centre crop to a square
             out = io.BytesIO()
             img.save(out, "JPEG", quality=82, optimize=True, progressive=True)
             return out.getvalue()

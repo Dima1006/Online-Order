@@ -22,3 +22,9 @@
 </fieldset>
 {% else %}<p class="muted small">Want milk or syrup choices? Create them first in <a href="/panel/options">Add-ons</a>.</p>{% endif %}
 {% endmacro %}
+
+
+{# Round photo (like a profile picture); without a photo, a circle with the first letter. size: sm | md | xl #}
+{% macro avatar(name, image, size="md") %}
+{% if image %}<img class="avatar {{ size }}" src="/media/{{ image }}" alt="" loading="lazy">{% else %}<span class="avatar {{ size }} blank" aria-hidden="true">{{ (name or "?")[:1] | upper }}</span>{% endif %}
+{% endmacro %}

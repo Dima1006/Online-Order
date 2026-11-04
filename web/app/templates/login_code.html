@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign in with a code · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Sign in with a code</h1>
+  <p class="muted">We email you a 6-digit code. No password needed.</p>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/login/code">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Email <input type="email" name="email" value="{{ email }}" required autocomplete="email" autofocus></label>
+    <button class="btn wide">Email me a code</button>
+  </form>
+  <p class="muted"><a href="/login?next={{ next | urlencode }}">Use a password instead</a></p>
+</section>
+{% endblock %}

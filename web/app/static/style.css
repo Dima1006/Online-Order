@@ -282,3 +282,125 @@ summary::-webkit-details-marker { display: none; }
 .opt span { flex: 1; }
 .opt em { font-style: normal; color: var(--muted); }
 .opt-actions { display: flex; gap: 12px; justify-content: flex-end; }
+
+/* =====================================================================
+   Redesign: round photos, venue header, footer, My orders, Settings, phone navigation
+   ===================================================================== */
+input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
+
+/* ---- round photos ("profile picture" style); no photo = first letter on a green circle */
+.avatar { border-radius: 50%; object-fit: cover; flex: none; background: var(--line); display: block; }
+.avatar.sm { width: 44px; height: 44px; }
+.avatar.md { width: 64px; height: 64px; }
+.avatar.xl { width: 104px; height: 104px; box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px var(--line); }
+.avatar.blank { display: grid; place-items: center; background: var(--brand); color: #fff; font: 700 1.3rem var(--display); }
+.avatar.md.blank { font-size: 1.6rem; }
+.avatar.xl.blank { font-size: 2.6rem; }
+
+/* ---- venue list on the home page */
+.venue-list a.vrow { display: flex; align-items: center; gap: 16px; padding: 14px 8px; }
+.vtext { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.vtext .vname { font-size: 1.2rem; }
+.vstate { flex: none; white-space: nowrap; }
+
+/* ---- venue page header */
+.vhead { display: flex; align-items: center; gap: 24px; margin: 8px 0 24px; }
+.vinfo { min-width: 0; }
+.vinfo h1 { margin-bottom: 8px; }
+.facts { margin: 0; display: grid; gap: 4px; }
+.facts > div { display: flex; gap: 12px; }
+.facts dt { flex: none; width: 64px; color: var(--muted); }
+.facts dd { margin: 0; }
+.vdesc { margin: 10px 0 0; max-width: 60ch; }
+@media (max-width: 560px) {
+  .vhead { gap: 16px; align-items: flex-start; }
+  .avatar.xl { width: 76px; height: 76px; }
+  .facts dt { width: 56px; }
+}
+
+/* ---- "pick-up name" card in the cart */
+.pickup { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; margin: 0 0 14px;
+  background: var(--bg); border-radius: 10px; }
+.pickup-text { display: grid; min-width: 0; }
+.btn.small { padding: 6px 16px; font-size: .9rem; }
+
+/* ---- add-on dialog: calm, brand-coloured controls instead of the browser's bright blue */
+#opt-dialog .opt { padding: 12px 0; border-bottom: 1px solid var(--line); margin: 0; }
+#opt-dialog fieldset .opt:last-child { border-bottom: 0; }
+.opt input { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; margin: 0; flex: none; background: var(--surface);
+  border: 2px solid #9AA59F; border-radius: 50%; display: grid; place-content: center; }
+.opt input[type=checkbox] { border-radius: 6px; }
+.opt input:checked { border-color: var(--brand); background: var(--brand); }
+.opt input[type=radio]:checked { box-shadow: inset 0 0 0 4px var(--surface); }
+.opt input[type=checkbox]:checked::after { content: ""; width: 5px; height: 10px; margin-top: -2px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.opt input:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
+
+/* ---- My orders */
+.ocards { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 12px; max-width: 760px; }
+.ocard { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.ocard > summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.ocard > summary::-webkit-details-marker { display: none; }
+.ocard .otitle { flex: 1; min-width: 0; display: grid; }
+.ocard .ototal { white-space: nowrap; }
+.ocard > summary .chev::after { content: ""; display: block; width: 9px; height: 9px; border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: rotate(45deg); transition: transform .15s; }
+.ocard[open] > summary .chev::after { transform: rotate(-135deg); }
+.obody { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+.obody .lines { margin-top: 4px; }
+.oactions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+@media (max-width: 520px) {
+  .ocard > summary { flex-wrap: wrap; }
+  .ocard .otitle { flex-basis: calc(100% - 100px); }
+  .ocard > summary .badge { margin-left: 56px; }
+  .ocard .ototal { margin-left: auto; }
+}
+
+/* ---- footer in columns */
+.foot { display: block; padding: 40px clamp(16px, 4vw, 40px) 24px; border-top: 1px solid var(--line); margin-top: 40px; font-size: 1rem; color: var(--ink); }
+.foot-grid { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.foot-brand p { margin: 8px 0 0; max-width: 28ch; }
+.foot nav { display: grid; gap: 8px; align-content: start; }
+.foot h3 { font: 700 .8rem var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+.foot nav a { text-decoration: none; color: var(--ink); }
+.foot nav a:hover { text-decoration: underline; }
+.foot-bottom { max-width: 1080px; margin: 32px auto 0; padding-top: 16px; border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .foot-grid { grid-template-columns: 1fr 1fr; } .foot-brand { grid-column: 1 / -1; } }
+
+/* ---- navigation on a phone: the venue menu stays on ONE line and scrolls sideways */
+.top { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .top { gap: 8px 12px; padding-bottom: 8px; }
+  .top .panelnav { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 6px; margin: 0 -4px; padding: 0 4px 6px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .top .panelnav::-webkit-scrollbar { display: none; }
+  .top .panelnav a, .top .panelnav .linklike { flex: none; white-space: nowrap; padding: 8px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); text-decoration: none; }
+  .top .panelnav form { flex: none; }
+  .nav-search { order: 2; flex-basis: 100%; max-width: none; }
+}
+
+/* ---- Settings: sections as cards with a side menu (a scrolling row on a phone) */
+.settings { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 32px; align-items: start; }
+.settings-nav { position: sticky; top: 84px; display: grid; gap: 2px; }
+.settings-nav a { padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--muted); }
+.settings-nav a:hover { background: var(--surface); color: var(--ink); }
+.settings-body { display: grid; gap: 20px; max-width: 640px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; scroll-margin-top: 84px; }
+.card h2 { margin-bottom: 12px; }
+.settings-form { display: grid; gap: 20px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.photo-card { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.photo-actions { display: grid; gap: 8px; min-width: 0; }
+.photo-actions .row-form { margin: 0; align-items: center; }
+.savebar { padding: 4px 0 8px; }
+.card .history li { grid-template-columns: 1fr auto auto; }
+@media (max-width: 820px) {
+  .settings { grid-template-columns: 1fr; gap: 16px; }
+  .settings-nav { position: static; display: flex; overflow-x: auto; gap: 6px; scrollbar-width: none; margin: 0 -4px; padding: 0 4px; }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav a { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; color: var(--ink); }
+  .pair { grid-template-columns: 1fr; }
+}
+
+/* ---- sign-in code */
+.code-input { font: 700 1.8rem var(--display); letter-spacing: .3em; text-align: center; }
+
+.vdesc, .note, .obody p, .facts dd, .vmeta, .otitle { overflow-wrap: anywhere; }

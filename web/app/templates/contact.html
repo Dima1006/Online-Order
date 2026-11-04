@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Contact us · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Contact us</h1>
+  <p class="muted">Questions, ideas, a venue you would like to see here? Write to us.</p>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/contact">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <label>Your name <input name="name" value="{{ form.name or (me.name if me else '') }}" required maxlength="60"></label>
+    <label>Email <input type="email" name="email" value="{{ form.email or (me.email if me else '') }}" required maxlength="254"></label>
+    <label>Message <textarea name="message" rows="6" required minlength="10" maxlength="2000">{{ form.message or '' }}</textarea></label>
+    <button class="btn wide">Send</button>
+  </form>
+</section>
+{% endblock %}

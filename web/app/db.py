@@ -7,7 +7,7 @@ from . import config as cfg
 from .utils import normalize
 
 DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent / "data" / "app.db"))
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -55,6 +55,23 @@ CREATE TABLE IF NOT EXISTS items (
     description TEXT NOT NULL DEFAULT '',
     is_available INTEGER NOT NULL DEFAULT 1,
     image TEXT NOT NULL DEFAULT ''
+);
+
+-- One-time sign-in codes sent by e-mail (stored only as a keyed hash, never in clear text).
+CREATE TABLE IF NOT EXISTS login_codes (
+    email TEXT PRIMARY KEY COLLATE NOCASE,
+    code_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    tries INTEGER NOT NULL DEFAULT 0
+);
+
+-- Messages from the "Contact us" form, read by the owner in /admin.
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Add-ons ("Milk", "Syrup", "Extra shot"): a group of options with a price each, attached to items.
@@ -189,7 +206,7 @@ def init_db() -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         has_venues = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='venues'").fetchone()
-        if has_venues and version < SCHEMA_VERSION:
+        if has_venues and version < 4:   # 4 -> 5 only adds tables, which CREATE IF NOT EXISTS below handles
             raise RuntimeError(
                 f"{DB_PATH} was created by an older version of this app (schema {version}, now {SCHEMA_VERSION}). "
                 "It only held demo data: delete the file and start again.")

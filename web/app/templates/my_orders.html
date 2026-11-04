@@ -1,17 +1,38 @@
 {% extends "base.html" %}
+{% from "_macros.html" import avatar %}
 {% block title %}My orders · {{ APP_NAME }}{% endblock %}
 {% block content %}
 <h1>My orders</h1>
 <div data-live-url="/my-orders" data-live-ws="/ws/me" data-live-select="#my-orders-list" id="live-box">
 <div id="my-orders-list">
 {% if orders %}
-<ul class="history big">
+<ul class="ocards">
   {% for o in orders %}
   <li>
-    <a href="/order/{{ o.id }}"><strong>#{{ o.id }} · {{ o.venue_name }}</strong><span class="muted"> {{ o.created_date }} {{ o.created_local }}</span></a>
-    <span class="badge status-{{ o.status }}">{{ o.status_label }}</span>
-    <span>{{ o.total | zl }}</span>
-    <a class="small" href="/v/{{ o.venue_slug }}?reorder={{ o.id }}">Order again</a>
+    <details class="ocard" {{ 'open' if o.status in ('new', 'preparing', 'ready') else '' }}>
+      <summary>
+        {{ avatar(o.venue_name, o.venue_image, "sm") }}
+        <span class="otitle">
+          <strong>{{ o.venue_name }}</strong>
+          <span class="muted small">#{{ o.id }} · {{ o.created_date }}, {{ o.created_local }}</span>
+        </span>
+        <span class="badge status-{{ o.status }}">{{ o.status_label }}</span>
+        <strong class="ototal">{{ o.total | zl }}</strong>
+        <span class="chev" aria-hidden="true"></span>
+      </summary>
+      <div class="obody">
+        <ul class="lines">
+          {% for it in o["items"] %}
+          <li><span>{{ it.qty }} × {{ it.name }}{% if it.variant_label %} <span class="muted">({{ it.variant_label }})</span>{% endif %}</span><span>{{ (it.price * it.qty) | zl }}</span></li>
+          {% endfor %}
+        </ul>
+        <p class="muted small">Pick-up around {{ o.arrival_local }}{% if o.note %} · Your note: {{ o.note }}{% endif %}{% if o.decline_reason %} · Reason: {{ o.decline_reason }}{% endif %}</p>
+        <div class="oactions">
+          <a class="btn small" href="/order/{{ o.id }}">Open order</a>
+          <a class="btn ghost small" href="/v/{{ o.venue_slug }}?reorder={{ o.id }}">Order again</a>
+        </div>
+      </div>
+    </details>
   </li>
   {% endfor %}
 </ul>

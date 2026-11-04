@@ -27,7 +27,7 @@ async def announce(order_id: int, *, new: bool = False) -> None:
     if o["user_id"]:
         hub.publish(f"user:{o['user_id']}", msg)
     # The customer may have closed the page: tell them by e-mail when it matters.
-    if not new and o["email"] and (o["email_verified"] or cfg.DEMO_MODE) and o["status"] in ("ready", "declined"):
+    if not new and o["email"] and o["email_verified"] and o["status"] in ("ready", "declined"):
         if o["status"] == "ready":
             send_mail_bg(o["email"], f"Order #{o['id']} is ready",
                          f"Your order #{o['id']} at {o['venue_name']} is ready for pickup.")

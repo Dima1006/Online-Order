@@ -41,6 +41,19 @@ async def send_mail(to: str, subject: str, body: str) -> bool:
         return False
 
 
+async def send_mail_checked(to: str, subject: str, body: str) -> str | None:
+    """Like send_mail, but returns the reason when it fails (None = sent). Used by the admin "test e-mail" button."""
+    if not cfg.SMTP_HOST:
+        return "SMTP is not configured: add the SMTP_HOST, SMTP_USER and SMTP_PASSWORD secrets."
+    try:
+        await asyncio.to_thread(_send_sync, to, subject, body)
+        return None
+    except smtplib.SMTPAuthenticationError:
+        return "The mail server refused the login. For Gmail use an App Password (not your normal password)."
+    except Exception as exc:
+        return f"{type(exc).__name__}: {str(exc)[:200]}"
+
+
 def send_mail_bg(to: str, subject: str, body: str) -> None:
     """Send without making the visitor wait for the mail server."""
     spawn(send_mail(to, subject, body))

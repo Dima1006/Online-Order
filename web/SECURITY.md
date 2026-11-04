@@ -40,3 +40,8 @@ Checked by `tests/test_smoke.py` (CSRF, login required, venue isolation, WebSock
 - Add-on choices are validated on the server against the database: options must belong to groups attached to that item, required groups need a choice, single-choice groups allow one. The price is always recomputed on the server.
 - Photos: type decided by decoding (JPG/PNG/WebP only), at most 6 MB and 25 megapixels, always re-encoded to JPEG (removes GPS/metadata and hidden payloads), random file names, strict name check when serving, upload CSRF check, 30 uploads per venue per hour, only two images processed at once. Only photo upload routes may exceed the normal 100 KB request limit.
 - Uploaded files live next to the database (`data/uploads`): back them up and keep them on the persistent disk.
+
+## Update: e-mail sign-in
+- Sign-in code: 6 digits, valid 10 minutes, stored only as a keyed hash (HMAC with SECRET_KEY), single use, burned after 5 wrong guesses, rate-limited per IP and per address; the answer is identical for unknown addresses. A valid code also confirms the address.
+- With working e-mail (SMTP_HOST set), customers must confirm their address before ordering.
+- Contact form: honeypot, 3 messages per IP per hour, messages stored for the admin. Admin "test e-mail" shows the real SMTP error.

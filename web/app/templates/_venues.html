@@ -1,12 +1,15 @@
+{% from "_macros.html" import avatar %}
 {% if venues %}
 <ul class="venue-list">
   {% for v in venues %}
   <li>
-    <a href="/v/{{ v.slug }}">
-      {% if v.image %}<img class="vthumb" src="/media/{{ v.image }}" alt="" width="72" height="72" loading="lazy">{% endif %}
-      <span class="vname">{{ v.name }}</span>
-      <span class="vmeta">{{ [v.address, v.city] | select | join(", ") or "Address not set" }}</span>
-      {% if v.matched %}<span class="vmatch">{{ v.matched | join(", ") }}</span>{% endif %}
+    <a class="vrow" href="/v/{{ v.slug }}">
+      {{ avatar(v.name, v.image, "md") }}
+      <span class="vtext">
+        <span class="vname">{{ v.name }}</span>
+        <span class="vmeta">{{ [v.address, v.city] | select | join(", ") or "Address not set" }}</span>
+        {% if v.matched %}<span class="vmatch">{{ v.matched | join(", ") }}</span>{% endif %}
+      </span>
       <span class="vstate {{ 'open' if v.is_open else 'closed' }}">{{ v.state }}</span>
     </a>
   </li>
