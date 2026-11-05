@@ -102,7 +102,7 @@ def visible_venue(request, conn, slug: str):
 def venue_context(request, conn, venue, form=None, reorder=None):
     menu = [c for c in load_menu(conn, venue["id"]) if c["items"]]
     ok, why = orders.venue_availability(venue)
-    options = orders.arrival_options(venue) if ok else []
+    options = orders.arrival_options(venue, conn=conn) if ok else []
     if ok and not options:
         why = f"Too late to order for today. Opening hours: {orders.hours_text(venue)}."
     from .web_options import load_groups  # local import: web_options itself imports this module

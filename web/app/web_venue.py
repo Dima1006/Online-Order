@@ -440,6 +440,28 @@ async def panel_settings(request, conn):
 
 
 @route
+async def change_email(request, conn):
+    form = await read_form(request)
+    venue = require_venue(request)
+    _throttle(f"vemail:{venue['id']}", 5, 3600)
+    new = clean(str(form.get("email", "")), 254).lower()
+    if not await verify_async(str(form.get("password", ""))[:129], venue["password_hash"]):
+        return go(request, "/panel/settings", error="Wrong password. The e-mail was not changed.")
+    if not valid_email(new):
+        return go(request, "/panel/settings", error="Enter a valid e-mail address.")
+    if new == venue["email"]:
+        return go(request, "/panel/settings", error="This is already your e-mail.")
+    if conn.execute("SELECT 1 FROM venues WHERE email = ?", (new,)).fetchone():
+        return go(request, "/panel/settings", error="This e-mail is already used by another venue.")
+    with conn:
+        conn.execute("UPDATE venues SET email = ? WHERE id = ?", (new, venue["id"]))
+    send_mail_bg(venue["email"], "Your venue login e-mail was changed",
+                 f"The login e-mail of {venue['name']} was changed to {new}. "
+                 "If this was not you, contact us at once and reset your password.")
+    return go(request, "/panel/settings", msg="E-mail changed. Use the new address to log in.")
+
+
+@route
 async def save_settings(request, conn):
     form = await read_form(request)
     venue = require_venue(request)
@@ -447,6 +469,7 @@ async def save_settings(request, conn):
     open_t, close_t = str(form.get("open_time", "")).strip(), str(form.get("close_time", "")).strip()
     try:
         prep, max_active = int(form.get("prep_minutes", "")), int(form.get("max_active", ""))
+        slot_cap = int(str(form.get("slot_capacity", "0")).strip() or 0)
     except ValueError:
         return go(request, "/panel/settings", error="Preparation time and order limit must be numbers.")
     if len(name) < 2:
@@ -457,13 +480,15 @@ async def save_settings(request, conn):
         return go(request, "/panel/settings", error="Choose a preparation time from the list.")
     if not 1 <= max_active <= 100:
         return go(request, "/panel/settings", error="The order limit must be between 1 and 100.")
+    if not 0 <= slot_cap <= 50:
+        return go(request, "/panel/settings", error="Orders per time slot must be between 0 and 50.")
     with conn:
         conn.execute(
             "UPDATE venues SET name = ?, city = ?, address = ?, description = ?, accepting_orders = ?, "
-            "open_time = ?, close_time = ?, prep_minutes = ?, max_active = ? WHERE id = ?",
+            "open_time = ?, close_time = ?, prep_minutes = ?, max_active = ?, slot_capacity = ? WHERE id = ?",
             (name, clean(str(form.get("city", "")), 60), clean(str(form.get("address", "")), 120),
              clean(str(form.get("description", "")), 300), 1 if form.get("accepting_orders") else 0,
-             open_t, close_t, prep, max_active, venue["id"]))
+             open_t, close_t, prep, max_active, slot_cap, venue["id"]))
     invalidate_index()
     return go(request, "/panel/settings", msg="Saved.")
 

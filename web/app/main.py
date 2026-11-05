@@ -124,6 +124,7 @@ routes = [
     Route("/panel/photo/venue", web_options.venue_photo, methods=P),
     Route("/media/{name}", media.media),
     Route("/panel/settings", web_venue.panel_settings),
+    Route("/panel/email", web_venue.change_email, methods=P),
     Route("/panel/settings/save", web_venue.save_settings, methods=P),
     Route("/panel/password", web_venue.panel_password, methods=P),
     Route("/panel/customers/{user_id:int}/reset", web_venue.reset_customer, methods=P),

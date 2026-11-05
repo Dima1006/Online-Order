@@ -69,7 +69,7 @@ def venue_availability(venue, now: datetime | None = None) -> tuple[bool, str]:
     return True, ""
 
 
-def arrival_options(venue, now: datetime | None = None) -> list[tuple[int, str]]:
+def arrival_options(venue, now: datetime | None = None, conn=None) -> list[tuple[int, str]]:
     """Arrival choices a customer may pick: not earlier than the venue's preparation time and inside opening hours."""
     now = now or utcnow()
     o, c = parse_hhmm(venue["open_time"]), parse_hhmm(venue["close_time"])
@@ -80,8 +80,17 @@ def arrival_options(venue, now: datetime | None = None) -> list[tuple[int, str]]
         at = now + timedelta(minutes=m)
         if o is not None and c is not None and not is_open_at(o, c, minutes_of_day(at)):
             continue
+        if conn is not None and venue["slot_capacity"] > 0 and _slot_load(conn, venue["id"], at) >= venue["slot_capacity"]:
+            continue   # this arrival slot is full
         result.append((m, hhmm(at)))
     return result
+
+
+def _slot_load(conn, venue_id: int, at: datetime) -> int:
+    """Active orders promised to arrive within about 15 minutes around `at`."""
+    lo, hi = (at - timedelta(minutes=7)).strftime(UTC_FMT), (at + timedelta(minutes=8)).strftime(UTC_FMT)
+    return conn.execute(f"SELECT COUNT(*) FROM orders WHERE venue_id = ? AND status IN {_ACTIVE_SQL} "
+                        "AND arrive_at >= ? AND arrive_at < ?", (venue_id, lo, hi)).fetchone()[0]
 
 
 def venue_state(venue, now: datetime | None = None) -> tuple[bool, str]:
@@ -146,8 +155,8 @@ def create_order(conn, venue, user, arrival_minutes: int, note: str, cart_json: 
     flag = customer_flag(conn, venue["id"], user["id"])
     if flag and flag["blocked"]:
         return None, "This venue blocked your orders after repeated no-shows. Please contact the venue."
-    if arrival_minutes not in dict(arrival_options(venue, now)):
-        return None, "Please choose one of the available arrival times."
+    if arrival_minutes not in dict(arrival_options(venue, now, conn)):
+        return None, "That arrival time is no longer available. Please choose another one."
 
     active_mine = conn.execute(f"SELECT COUNT(*) FROM orders WHERE user_id = ? AND status IN {_ACTIVE_SQL}",
                                (user["id"],)).fetchone()[0]

@@ -7,7 +7,7 @@ from . import config as cfg
 from .utils import normalize
 
 DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent / "data" / "app.db"))
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS venues (
     close_time TEXT NOT NULL DEFAULT '00:00',
     prep_minutes INTEGER NOT NULL DEFAULT 5,  -- earliest arrival a customer can choose
     max_active INTEGER NOT NULL DEFAULT 15,   -- the venue stops taking orders above this many active ones
+    slot_capacity INTEGER NOT NULL DEFAULT 0, -- max active orders per arrival slot (0 = no limit)
     paused_until TEXT,                        -- UTC; short "we are swamped" pause
     image TEXT NOT NULL DEFAULT '',           -- file name in the uploads folder ('' = no photo)
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -211,6 +212,10 @@ def init_db() -> None:
                 f"{DB_PATH} was created by an older version of this app (schema {version}, now {SCHEMA_VERSION}). "
                 "It only held demo data: delete the file and start again.")
         conn.execute("PRAGMA journal_mode = WAL")
+        if has_venues and version == 5:   # 5 -> 6 adds one column
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(venues)")}
+            if "slot_capacity" not in cols:
+                conn.execute("ALTER TABLE venues ADD COLUMN slot_capacity INTEGER NOT NULL DEFAULT 0")
         conn.executescript(SCHEMA)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()

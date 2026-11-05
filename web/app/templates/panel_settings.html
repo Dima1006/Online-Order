@@ -63,10 +63,23 @@
           <label>Max active orders <input type="number" name="max_active" min="1" max="100" value="{{ venue.max_active }}" required></label>
         </div>
         <p class="muted small">When this many orders are active, new orders are paused until you catch up.</p>
+        <label>Orders per time slot <span class="muted">(0 = no limit)</span> <input type="number" name="slot_capacity" min="0" max="50" value="{{ venue.slot_capacity }}"></label>
+        <p class="muted small">Limits how many orders can be promised for the same 15 minutes, so a rush does not pile up. A full time disappears from the customer's list.</p>
       </section>
 
       <div class="savebar"><button class="btn">Save changes</button></div>
     </form>
+
+    <section class="card" id="account">
+      <h2>Login e-mail</h2>
+      <p class="muted small">Current: <b>{{ venue.email }}</b>. Orders and password resets go to this address.</p>
+      <form method="post" action="/panel/email" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>New e-mail <input type="email" name="email" required maxlength="254" autocomplete="email"></label>
+        <label>Your password <input type="password" name="password" required autocomplete="current-password"></label>
+        <button class="btn ghost">Change e-mail</button>
+      </form>
+    </section>
 
     <section class="card" id="customers">
       <h2>Customers with no-shows</h2>
