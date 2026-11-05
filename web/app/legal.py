@@ -8,8 +8,10 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from . import config as cfg
-from .core import render, require_user, route
+from . import i18n
+from .core import go, render, require_user, route
 from .security import client_ip
+from .utils import safe_next
 
 
 async def captcha_ok(request, form) -> bool:
@@ -37,12 +39,23 @@ CAPTCHA_ERROR = "Please confirm that you are not a robot and try again."
 
 @route
 async def privacy(request, conn):
-    return render(request, "privacy.html")
+    return render(request, "privacy_pl.html" if i18n.get_lang(request) == "pl" else "privacy.html")
 
 
 @route
 async def terms(request, conn):
-    return render(request, "terms.html")
+    return render(request, "terms_pl.html" if i18n.get_lang(request) == "pl" else "terms.html")
+
+
+@route
+async def set_lang(request, conn):
+    """Remember the visitor's language (a plain cookie) and go back to where they were."""
+    code = request.path_params["code"]
+    if code not in i18n.LANGS:
+        raise HTTPException(404, "Not found")
+    response = go(request, safe_next(request.query_params.get("next")))
+    response.set_cookie(i18n.COOKIE, code, max_age=365 * 86400, samesite="lax", secure=request.url.scheme == "https", path="/")
+    return response
 
 
 @route

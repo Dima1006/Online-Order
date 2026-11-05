@@ -12,7 +12,7 @@ from starlette.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from . import config as cfg
-from . import db, google, orders
+from . import db, google, i18n, orders
 from .orders import ACTION_LABELS, ALLOWED, ARRIVAL_CHOICES, STATUS_LABELS
 from .security import csrf_token, csrf_valid
 from .utils import (Busy, format_zl, hash_password_limited, session_fingerprint, verify_password_limited)
@@ -176,7 +176,12 @@ def render(request, name: str, status_code: int = 200, *, fragment: bool = False
             ctx["ven_new"] = conn.execute("SELECT COUNT(*) FROM orders WHERE venue_id = ? AND status = 'new'",
                                           (ven["id"],)).fetchone()[0]
     ctx["flashes"] = [] if fragment else request.session.pop("flash", [])
-    return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+    lang = ctx["lang"] = i18n.get_lang(request)
+    response = templates.TemplateResponse(request, name, ctx, status_code=status_code)
+    if lang == "pl":   # the whole site is written in English and translated on the way out
+        response.body = i18n.translate_html(response.body.decode("utf-8")).encode("utf-8")
+        response.headers["content-length"] = str(len(response.body))
+    return response
 
 
 async def http_error(request, exc: HTTPException):

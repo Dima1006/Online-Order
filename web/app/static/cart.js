@@ -1,4 +1,5 @@
 (() => {
+  const T = (s) => (window.I18N && window.I18N[s]) || s;   // Polish texts come from i18n_pl.js
   const dataEl = document.getElementById("menu-data");
   if (!dataEl) return;
   const menu = JSON.parse(dataEl.textContent);   // { v: {variant id: {...}}, g: {group id: {...}} }
@@ -80,7 +81,7 @@
         const n = Object.values(cart).filter((l) => l.v === v).reduce((s, l) => s + l.q, 0);
         const b = el("button", { type: "button", className: "add", textContent: n ? "Add (" + n + ")" : "Add" });
         b.dataset.options = v; b.disabled = !isOpen;
-        b.setAttribute("aria-label", "Choose options for " + menu.v[v].name);
+        b.setAttribute("aria-label", T("Choose options for ") + menu.v[v].name);
         ctl.className = "ctl"; ctl.append(b);
         return;
       }
@@ -91,8 +92,8 @@
         ctl.className = "ctl"; ctl.append(b);
       } else {
         ctl.className = "ctl stepper";
-        ctl.append(stepBtn("−", k, -1, "Remove one " + menu.v[v].name), el("span", { textContent: qty }),
-                   stepBtn("+", k, 1, "Add one " + menu.v[v].name));
+        ctl.append(stepBtn("−", k, -1, T("Remove one ") + menu.v[v].name), el("span", { textContent: qty }),
+                   stepBtn("+", k, 1, T("Add one ") + menu.v[v].name));
       }
     });
     document.querySelectorAll(".item[data-variants]").forEach((li) => {
@@ -116,8 +117,8 @@
         el("span", { textContent: label(line) }),
         el("strong", { textContent: money(unit(line) * line.q) }),
         el("span", { className: "qty" },
-          stepBtn("−", k, -1, "Remove one " + label(line)), el("span", { textContent: line.q }),
-          stepBtn("+", k, 1, "Add one " + label(line)))));
+          stepBtn("−", k, -1, T("Remove one ") + label(line)), el("span", { textContent: line.q }),
+          stepBtn("+", k, 1, T("Add one ") + label(line)))));
     }
     $("cart-empty").hidden = count > 0;
     $("cart-total").textContent = money(total);
@@ -171,7 +172,7 @@
       e.preventDefault();
       const v = Number(dialog.dataset.variant), o = chosen();
       if (!valid({ v, o, q: 1 })) {
-        $("opt-error").textContent = "Please choose an option in each required group.";
+        $("opt-error").textContent = T("Please choose an option in each required group.");
         $("opt-error").hidden = false;
         return;
       }

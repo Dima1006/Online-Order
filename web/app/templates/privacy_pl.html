@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Polityka prywatności · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<article class="prose">
+<h1>Polityka prywatności</h1>
+<p class="muted small">Poniżej wyjaśniamy prostym językiem, co {{ APP_NAME }} robi z Twoimi danymi. Administrator: {{ company or "operator tego serwisu" }}{% if company_address %}, {{ company_address }}{% endif %}.{% if privacy_email %} Kontakt: <a href="mailto:{{ privacy_email }}">{{ privacy_email }}</a>.{% else %} Kontakt: <a href="/contact">formularz kontaktowy</a>.{% endif %}</p>
+
+<h2>Jakie dane zbieramy</h2>
+<ul>
+<li><b>Klienci:</b> imię, e-mail, telefon (opcjonalnie), hasło (przechowujemy tylko jego zaszyfrowany skrót) oraz zamówienia (lokal, pozycje, godzina przybycia, uwaga).</li>
+<li><b>Lokale:</b> e-mail właściciela, skrót hasła, nazwa lokalu, adres, opis, godziny otwarcia, menu i zdjęcia oraz otrzymane zamówienia.</li>
+<li><b>Dane techniczne:</b> pliki cookie sesji, które utrzymują zalogowanie, oraz adres IP, używany wyłącznie do ochrony przed nadużyciami (limity żądań) i bezpieczeństwa.</li>
+<li><b>Wiadomości</b> wysłane przez formularz kontaktowy.</li>
+</ul>
+
+<h2>Po co ich używamy</h2>
+<p>Aby świadczyć usługę, o którą prosisz: założyć konto, przekazać zamówienie lokalowi, pokazać jego status i dbać o bezpieczeństwo serwisu (podstawa prawna: wykonanie umowy oraz nasz prawnie uzasadniony interes w zakresie bezpieczeństwa, art. 6 ust. 1 lit. b i f RODO). Wysyłamy e-maile tylko w sprawie konta i zamówień. Nie sprzedajemy danych i nie używamy ich do reklam.</p>
+
+<h2>Kto je otrzymuje</h2>
+<p>Lokal, w którym zamawiasz, widzi Twoje imię, telefon, uwagę i zamówienie. Dostawcy hostingu i poczty przetwarzają dane w naszym imieniu. Jeśli korzystasz z powiadomień Telegram lub logowania przez Google, te usługi otrzymują dane potrzebne do działania funkcji.</p>
+
+<h2>Pliki cookie</h2>
+<p>Używamy tylko niezbędnych plików cookie: sesji oraz wybranego języka. Nie stosujemy cookies analitycznych ani reklamowych.</p>
+
+<h2>Jak długo</h2>
+<p>Dane konta przechowujemy do czasu usunięcia konta. Po usunięciu lokale zachowują sumy zamówień bez Twojego imienia, telefonu i uwagi, na potrzeby księgowości.</p>
+
+<h2>Twoje prawa</h2>
+<p>Dane możesz zobaczyć i poprawić w sekcji <a href="/account">Moje konto</a>, tam też możesz pobrać swoje dane i usunąć konto. Możesz także żądać ograniczenia lub zaprzestania przetwarzania albo złożyć skargę do organu nadzorczego (w Polsce: UODO, <i>uodo.gov.pl</i>).</p>
+</article>
+{% endblock %}

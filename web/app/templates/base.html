@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -74,8 +74,10 @@
         <a href="/terms">Terms of use</a>
       </nav>
     </div>
-    <p class="foot-bottom small muted">© {{ APP_NAME }}. Pay at the venue when you pick up your order.</p>
+    <p class="foot-bottom small muted">© {{ APP_NAME }}. Pay at the venue when you pick up your order.
+      <span class="langs"><a href="/lang/en?next={{ request.url.path | urlencode }}" hreflang="en">English</a> · <a href="/lang/pl?next={{ request.url.path | urlencode }}" hreflang="pl">Polski</a></span></p>
   </footer>
+  {% if lang == 'pl' %}<script src="{{ static('i18n_pl.js') }}"></script>{% endif %}
   <script src="{{ static('app.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

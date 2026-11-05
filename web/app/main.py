@@ -90,6 +90,7 @@ routes = [
     Route("/account/password", web_account.account_password, methods=P),
     Route("/account/export", legal.account_export),
     Route("/privacy", legal.privacy),
+    Route("/lang/{code}", legal.set_lang),
     Route("/terms", legal.terms),
     Route("/account/delete", web_account.account_delete, methods=P),
     Route("/my-orders", web_account.my_orders),

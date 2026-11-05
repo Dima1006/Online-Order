@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Regulamin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<article class="prose">
+<h1>Regulamin</h1>
+<p class="muted small">Operator: {{ company or "operator tego serwisu" }}{% if company_address %}, {{ company_address }}{% endif %}.</p>
+
+<h2>Czym jest {{ APP_NAME }}</h2>
+<p>{{ APP_NAME }} pozwala zamawiać z wyprzedzeniem w kawiarniach i innych lokalach oraz odbierać zamówienia na miejscu. Sprzedaż następuje między Tobą a lokalem. {{ APP_NAME }} przekazuje zamówienie dalej i nie przygotowuje, nie sprzedaje ani nie dostarcza towarów.</p>
+
+<h2>Zamówienia i płatność</h2>
+<p>Płacisz w lokalu przy odbiorze zamówienia, chyba że lokal oferuje inną metodę. Ceny i dostępność ustala lokal. Lokal może odrzucić lub anulować zamówienie, na przykład gdy pozycja jest wyprzedana.</p>
+
+<h2>Twoje konto</h2>
+<p>Podawaj prawdziwe dane i zachowaj hasło w tajemnicy. Jeśli wielokrotnie nie odbierasz zamówień, lokal może przestać przyjmować Twoje zamówienia. Konto możesz usunąć w dowolnym momencie.</p>
+
+<h2>Lokale</h2>
+<p>Lokale są zatwierdzane, zanim się pojawią. Lokal odpowiada za menu, ceny, informacje o alergenach, zdjęcia (musi mieć prawo do ich użycia) oraz za realizację przyjętych zamówień. Możemy zawiesić lokal, który narusza ten regulamin.</p>
+
+<h2>Zasady korzystania</h2>
+<p>Zakaz nadużyć, automatycznych masowych żądań, fałszywych zamówień i prób zakłócania działania serwisu.</p>
+
+<h2>Odpowiedzialność</h2>
+<p>Dbamy o dostępność serwisu, ale nie gwarantujemy, że będzie działał bez przerw. Nic w tym regulaminie nie ogranicza praw przysługujących Ci jako konsumentowi na mocy prawa polskiego i unijnego.</p>
+
+<h2>Zmiany</h2>
+<p>Możemy aktualizować regulamin; aktualna wersja jest zawsze na tej stronie.</p>
+<p>Pytania: <a href="/contact">napisz do nas</a>.</p>
+</article>
+{% endblock %}
