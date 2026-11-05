@@ -76,6 +76,32 @@ async def send_mail(to: str, subject: str, body: str) -> bool:
         return False
 
 
+def _smtp_steps(port: int) -> str:
+    """Walks through the SMTP conversation step by step and says where the server hangs up. Sends no mail."""
+    steps = []
+    s = None
+    try:
+        s = smtplib.SMTP(timeout=10)
+        code, msg = s.connect(cfg.SMTP_HOST, port); steps.append(f"connect {code}")
+        code, msg = s.ehlo(); steps.append(f"ehlo {code}")
+        code, msg = s.starttls(); steps.append(f"starttls {code}")
+        code, msg = s.ehlo(); steps.append(f"ehlo-tls {code}")
+        if cfg.SMTP_USER:
+            code, msg = s.login(cfg.SMTP_USER, cfg.SMTP_PASSWORD); steps.append(f"login {code}")
+        steps.append("OK: the server accepts this login")
+    except smtplib.SMTPAuthenticationError as exc:
+        steps.append(f"login REFUSED {exc.smtp_code} {exc.smtp_error.decode('utf-8', 'replace')[:100]}")
+    except Exception as exc:
+        steps.append(f"STOPPED after '{steps[-1] if steps else 'start'}': {type(exc).__name__} {str(exc)[:120]}")
+    finally:
+        try:
+            if s:
+                s.close()
+        except Exception:
+            pass
+    return " > ".join(steps)
+
+
 def _diagnose_sync() -> str:
     """What the server can see: settings (no secrets) and whether the mail ports answer. Shown to the admin."""
     if cfg.BREVO_API_KEY:
@@ -87,17 +113,13 @@ def _diagnose_sync() -> str:
         parts.append("DNS ok: " + ", ".join(ips[:3]))
     except OSError as exc:
         return " | ".join(parts + [f"DNS FAILED: {exc}. The SMTP_HOST value is wrong."])
-    for port in (587, 465):
-        try:
-            with socket.create_connection((cfg.SMTP_HOST, port), timeout=8) as s:
-                if port == 587:
-                    s.settimeout(8)
-                    banner = s.recv(120).decode("ascii", "replace").strip()
-                    parts.append(f"port 587 answers: {banner[:80]!r}" if banner else "port 587 connects but sends NOTHING (closed by a firewall or proxy)")
-                else:
-                    parts.append("port 465 connects")
-        except OSError as exc:
-            parts.append(f"port {port} FAILED: {type(exc).__name__} {exc}")
+    parts.append(f"our hostname={socket.getfqdn()!r}")
+    parts.append("conversation: " + _smtp_steps(587))
+    try:
+        with socket.create_connection((cfg.SMTP_HOST, 465), timeout=8):
+            parts.append("port 465 connects")
+    except OSError as exc:
+        parts.append(f"port 465 FAILED: {type(exc).__name__} {exc}")
     return " | ".join(parts)
 
 
