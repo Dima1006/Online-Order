@@ -130,6 +130,7 @@ routes = [
     Route("/admin/login", web_admin.admin_login, methods=GP),
     Route("/admin", web_admin.admin_home),
     Route("/admin/test-mail", web_admin.admin_test_mail, methods=P),
+    Route("/admin/mail-check", web_admin.admin_mail_check, methods=P),
     Route("/admin/venues/{venue_id:int}/{action}", web_admin.admin_venue_action, methods=P),
     Route("/admin/flags/{venue_id:int}/{user_id:int}/unblock", web_admin.admin_unblock_user, methods=P),
     Mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static"),

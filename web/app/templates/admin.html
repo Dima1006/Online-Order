@@ -45,6 +45,8 @@
 
 <h2 class="gap">Email</h2>
 <p>{% if mail_enabled %}Sending is <strong>on</strong>. Reset links, confirmations and sign-in codes are sent by email.{% else %}Sending is <strong>off</strong>: password reset and sign-in codes cannot work. Add the <code>SMTP_HOST</code>, <code>SMTP_USER</code> and <code>SMTP_PASSWORD</code> secrets, or <code>BREVO_API_KEY</code>.{% endif %}</p>
+<form method="post" action="/admin/mail-check" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn ghost">Check mail connection</button></form>
 <form method="post" action="/admin/test-mail" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
   <button class="btn ghost">Send a test email{% if admin_email %} to {{ admin_email }}{% endif %}</button></form>
 

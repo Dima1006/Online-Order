@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import smtplib
+import socket
 import urllib.error
 import urllib.request
 from email.message import EmailMessage
@@ -73,6 +74,35 @@ async def send_mail(to: str, subject: str, body: str) -> bool:
     except Exception as exc:  # never break a request because mail is down
         log.error("Could not send mail to %s: %s", to, exc)
         return False
+
+
+def _diagnose_sync() -> str:
+    """What the server can see: settings (no secrets) and whether the mail ports answer. Shown to the admin."""
+    if cfg.BREVO_API_KEY:
+        return f"Using Brevo API, sender {cfg.MAIL_FROM or '(not set)'}, key length {len(cfg.BREVO_API_KEY)}."
+    parts = [f"host={cfg.SMTP_HOST!r}", f"port={cfg.SMTP_PORT}", f"user={cfg.SMTP_USER!r}",
+             f"password length={len(cfg.SMTP_PASSWORD)} (a Google app password has 16)"]
+    try:
+        ips = sorted({a[4][0] for a in socket.getaddrinfo(cfg.SMTP_HOST, cfg.SMTP_PORT, type=socket.SOCK_STREAM)})
+        parts.append("DNS ok: " + ", ".join(ips[:3]))
+    except OSError as exc:
+        return " | ".join(parts + [f"DNS FAILED: {exc}. The SMTP_HOST value is wrong."])
+    for port in (587, 465):
+        try:
+            with socket.create_connection((cfg.SMTP_HOST, port), timeout=8) as s:
+                if port == 587:
+                    s.settimeout(8)
+                    banner = s.recv(120).decode("ascii", "replace").strip()
+                    parts.append(f"port 587 answers: {banner[:80]!r}" if banner else "port 587 connects but sends NOTHING (closed by a firewall or proxy)")
+                else:
+                    parts.append("port 465 connects")
+        except OSError as exc:
+            parts.append(f"port {port} FAILED: {type(exc).__name__} {exc}")
+    return " | ".join(parts)
+
+
+async def diagnose() -> str:
+    return await asyncio.to_thread(_diagnose_sync)
 
 
 async def send_mail_checked(to: str, subject: str, body: str) -> str | None:

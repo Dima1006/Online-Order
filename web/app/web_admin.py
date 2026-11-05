@@ -6,7 +6,7 @@ from starlette.exceptions import HTTPException
 
 from . import config as cfg
 from .core import go, login_session, read_form, render, require_admin, route
-from .mail import public_url, send_mail_bg, send_mail_checked
+from .mail import diagnose, public_url, send_mail_bg, send_mail_checked
 from .security import client_ip, limiter
 from .web_public import invalidate_index
 
@@ -108,3 +108,14 @@ async def admin_unblock_user(request, conn):
         conn.execute("DELETE FROM venue_customer_flags WHERE venue_id = ? AND user_id = ?",
                      (request.path_params["venue_id"], request.path_params["user_id"]))
     return go(request, "/admin", msg="Warnings cleared.")
+
+
+@route
+async def admin_mail_check(request, conn):
+    """Shows how the mail settings look from the server (no secrets) and whether the mail ports answer."""
+    _enabled()
+    await read_form(request)
+    require_admin(request)
+    if not limiter.allow("admin-mail-check", 10, 600):
+        raise HTTPException(429, "Please wait a few minutes before checking again.")
+    return go(request, "/admin", msg="Mail check: " + await diagnose())

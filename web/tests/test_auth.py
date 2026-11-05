@@ -111,6 +111,7 @@ with TestClient(app, base_url=B) as c:
     a = TestClient(app, base_url=B); a.post("/admin/login", data={"csrf": csrf(a, "/admin/login"), "password": "adminpass-123"})
     page = a.get("/admin").text; assert "Hello, I own a bakery" in page and "Sending is <strong>on</strong>" in page
     r = a.post("/admin/test-mail", data={"csrf": csrf(a, "/admin")}, follow_redirects=True); assert "Test email sent" in r.text
+    r = a.post("/admin/mail-check", data={"csrf": csrf(a, "/admin")}, follow_redirects=True); assert "Mail check:" in r.text and "smtp.test" in r.text and "password length=1" in r.text
     FAIL.append("Connection refused")
     r = a.post("/admin/test-mail", data={"csrf": csrf(a, "/admin")}, follow_redirects=True); assert "Test email failed" in r.text and "Connection refused" in r.text
     FAIL.clear()
