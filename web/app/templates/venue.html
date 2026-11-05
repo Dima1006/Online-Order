@@ -35,22 +35,23 @@
         {% for item in cat["items"] %}
         {% set vs = item.variants %}
         <li class="item {{ '' if item.is_available else 'soldout' }}" data-variants="{{ vs | map(attribute='id') | join(',') }}">
+          {% macro head(item) %}{% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="56" height="56" loading="lazy">{% endif %}{% endmacro %}
           {% if not item.is_available %}
           <div class="irow">
-            {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
-            <span class="muted">Sold out</span>
+            {{ head(item) }}
+            <div class="iinfo"><strong class="iname">{{ item.name }}</strong>{% if item.description %}<span class="idesc">{{ item.description }}</span>{% endif %}<span class="iprice muted">Sold out</span></div>
           </div>
           {% elif vs | length == 1 %}
           <div class="irow">
-            {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
-            <span class="iprice">{{ vs[0].price | zl }}</span>
+            {{ head(item) }}
+            <div class="iinfo"><strong class="iname">{{ item.name }}</strong>{% if item.description %}<span class="idesc">{{ item.description }}</span>{% endif %}<span class="iprice">{{ vs[0].price | zl }}</span></div>
             <span class="ctl" data-variant="{{ vs[0].id }}"></span>
           </div>
           {% else %}
           <details class="multi">
             <summary class="irow">
-              {% if item.image %}<img class="thumb" src="/media/{{ item.image }}" alt="" width="64" height="64" loading="lazy">{% endif %}<div class="iinfo"><strong>{{ item.name }}</strong>{% if item.description %}<span class="muted">{{ item.description }}</span>{% endif %}</div>
-              <span class="iprice"><span class="muted">from</span> {{ (vs | map(attribute='price') | min) | zl }}</span>
+              {{ head(item) }}
+              <div class="iinfo"><strong class="iname">{{ item.name }}</strong>{% if item.description %}<span class="idesc">{{ item.description }}</span>{% endif %}<span class="iprice"><span class="muted">from</span> {{ (vs | map(attribute='price') | min) | zl }}</span></div>
               <span class="incart" hidden></span>
               <span class="chev" aria-hidden="true"></span>
             </summary>

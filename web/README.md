@@ -44,3 +44,5 @@ Panel → **Add-ons**: create groups (Milk, Syrup...) with options and extra pri
 
 ## E-mail (password reset, confirmation, sign-in code)
 All of it needs the `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` (and `ADMIN_EMAIL`) secrets. For Gmail: host `smtp.gmail.com`, your address, and an **App Password**. After adding them open `/admin` and press **Send a test email**: it shows the exact error if something is wrong. Tests: `python3 -I tests/test_auth.py`.
+
+If SMTP is blocked on your network, use Brevo's HTTPS API instead: secrets `BREVO_API_KEY` and `MAIL_FROM` (an address verified as a sender in Brevo). The workflow file must pass them to the app (`BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}`).

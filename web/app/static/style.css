@@ -404,3 +404,28 @@ input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
 .code-input { font: 700 1.8rem var(--display); letter-spacing: .3em; text-align: center; }
 
 .vdesc, .note, .obody p, .facts dd, .vmeta, .otitle { overflow-wrap: anywhere; }
+
+/* =====================================================================
+   Compact menu: a photo (optional), the name with its price right under it, and the button at the edge
+   ===================================================================== */
+.cat > summary { padding: 12px 4px; }
+.cat > summary h2 { font-size: 1.15rem; margin: 0; }
+.items { padding: 0; border-radius: 0 0 12px 12px; overflow: hidden; margin-bottom: 8px; }
+.irow, .multi > summary.irow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 0; }
+.iinfo { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.iname { font-size: 1rem; line-height: 1.3; }
+.idesc { font-size: .85rem; color: var(--muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.iinfo .iprice { font-size: .95rem; font-weight: 600; margin-top: 1px; }
+.item .thumb { width: 56px; height: 56px; border-radius: 10px; }
+.ctl { min-width: 0; }
+.add { padding: 6px 16px; font-size: .9rem; }
+.stepper { gap: 8px; }
+.stepper button, .qty button { width: 30px; height: 30px; }
+.multi .chev::after { content: ""; display: block; width: 8px; height: 8px; border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: rotate(45deg); margin: -3px 2px 0; transition: transform .15s; }
+.multi[open] .chev::after { transform: rotate(-135deg); margin-top: 3px; }
+.sizes-list { padding: 0 14px 6px; background: #F7F8F6; border-top: 1px solid var(--line); }
+.size { display: flex; align-items: center; gap: 12px; padding: 6px 0; min-height: 44px; border-top: 1px solid var(--line); }
+.size:first-child { border-top: 0; }
+.size .slabel { flex: 1; min-width: 0; }
+.size .iprice { font-weight: 600; }
+.item.soldout .irow { opacity: .55; }

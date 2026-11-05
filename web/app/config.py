@@ -32,18 +32,24 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")          # empty = admin panel 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
+# Values pasted into GitHub secrets often carry a stray space or newline: trim them.
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "").strip() or "587")
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+if SMTP_HOST.lower() == "smtp.gmail.com":
+    SMTP_PASSWORD = SMTP_PASSWORD.replace(" ", "")   # Google shows app passwords as "abcd efgh ijkl mnop"
+SMTP_FROM = os.getenv("SMTP_FROM", "").strip() or SMTP_USER
+# Alternative to SMTP: Brevo's HTTPS API (works where mail ports are blocked). Sender = a sender address verified in Brevo.
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+MAIL_FROM = os.getenv("MAIL_FROM", "").strip() or SMTP_FROM or os.getenv("ADMIN_EMAIL", "").strip()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = ""  # filled in at startup from getMe
 
 # Print the body of e-mails (password-reset links!) to the log when SMTP is not set up. Local development only.
 MAIL_LOG_BODY = env_bool("MAIL_LOG_BODY")
-MAIL_ENABLED = bool(SMTP_HOST)
+MAIL_ENABLED = bool(SMTP_HOST or BREVO_API_KEY)
 # With working e-mail, customers must confirm their address before ordering (otherwise nobody could be reached).
 VERIFY_REQUIRED = MAIL_ENABLED
 CODE_TTL_MIN = 10                # a sign-in code from e-mail works this long
