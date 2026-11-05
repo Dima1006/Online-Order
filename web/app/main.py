@@ -11,7 +11,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
 from . import config as cfg
-from . import db, events, media, orders, telegram, web_account, web_admin, web_contact, web_options, web_public, web_venue
+from . import db, events, legal, media, orders, telegram, web_account, web_admin, web_contact, web_options, web_public, web_venue
 from .core import BASE_DIR, Redirect, http_error, redirect_handler, render, route, server_error
 from .security import SecurityMiddleware
 from .seed import seed_demo
@@ -88,6 +88,9 @@ routes = [
     Route("/account", web_account.account),
     Route("/account/update", web_account.account_update, methods=P),
     Route("/account/password", web_account.account_password, methods=P),
+    Route("/account/export", legal.account_export),
+    Route("/privacy", legal.privacy),
+    Route("/terms", legal.terms),
     Route("/account/delete", web_account.account_delete, methods=P),
     Route("/my-orders", web_account.my_orders),
     Route("/order/{order_id:int}", web_account.order_page),

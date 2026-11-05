@@ -81,3 +81,11 @@ RATE_SEARCH = (40, 60)           # live-search requests per IP per 60 s
 HASH_CONCURRENCY = 4             # password hashes computed at the same time (each uses ~16 MB)
 QUERY_TIMEOUT_S = 3              # a single database query running longer than this is aborted
 WS_MAX_PER_IP = 10               # open WebSockets per IP
+
+# ---- legal / captcha (all optional)
+COMPANY_NAME = os.getenv("COMPANY_NAME", "").strip()        # who runs the service (shown in Privacy Policy / Terms)
+COMPANY_ADDRESS = os.getenv("COMPANY_ADDRESS", "").strip()
+PRIVACY_EMAIL = os.getenv("PRIVACY_EMAIL", "").strip() or ADMIN_EMAIL
+TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY", "").strip()   # Cloudflare Turnstile (free CAPTCHA)
+TURNSTILE_SECRET = os.getenv("TURNSTILE_SECRET", "").strip()
+CAPTCHA_ENABLED = bool(TURNSTILE_SITE_KEY and TURNSTILE_SECRET)

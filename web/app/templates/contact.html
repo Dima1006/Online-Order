@@ -11,6 +11,7 @@
     <label>Your name <input name="name" value="{{ form.name or (me.name if me else '') }}" required maxlength="60"></label>
     <label>Email <input type="email" name="email" value="{{ form.email or (me.email if me else '') }}" required maxlength="254"></label>
     <label>Message <textarea name="message" rows="6" required minlength="10" maxlength="2000">{{ form.message or '' }}</textarea></label>
+    {% if captcha_site_key %}<div class="cf-turnstile" data-sitekey="{{ captcha_site_key }}"></div><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
     <button class="btn wide">Send</button>
   </form>
 </section>

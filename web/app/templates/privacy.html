@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<article class="prose">
+<h1>Privacy Policy</h1>
+<p class="muted small">This text explains in plain language what {{ APP_NAME }} does with your data. Controller: {{ company or "the operator of this site" }}{% if company_address %}, {{ company_address }}{% endif %}.{% if privacy_email %} Contact: <a href="mailto:{{ privacy_email }}">{{ privacy_email }}</a>.{% else %} Contact: <a href="/contact">contact form</a>.{% endif %}</p>
+
+<h2>What we collect</h2>
+<ul>
+<li><b>Customers:</b> name, e-mail, phone (optional), password (stored only as a salted hash), and your orders (venue, items, arrival time, note).</li>
+<li><b>Venues:</b> owner e-mail, password hash, venue name, address, description, opening hours, menu and photos, and the orders received.</li>
+<li><b>Technical data:</b> a session cookie that keeps you signed in, and your IP address, used only for abuse protection (rate limits) and security.</li>
+<li><b>Messages</b> you send through the contact form.</li>
+</ul>
+
+<h2>Why we use it</h2>
+<p>To run the service you asked for: create your account, pass your order to the venue, show its status, and keep the site secure (legal basis: performance of a contract and our legitimate interest in security, Art. 6(1)(b) and (f) GDPR). We send e-mails only about your account and orders. We do not sell your data and do not use it for advertising.</p>
+
+<h2>Who receives it</h2>
+<p>The venue you order from sees your name, phone, note and order. Our hosting and e-mail providers process data on our behalf. If you use Telegram notifications or Google sign-in, those services receive the data needed for that feature.</p>
+
+<h2>Cookies</h2>
+<p>We use only one essential cookie (session). No analytics or advertising cookies.</p>
+
+<h2>How long</h2>
+<p>Your account data is kept until you delete the account. After deletion, venues keep order totals without your name, phone or note, for their bookkeeping.</p>
+
+<h2>Your rights</h2>
+<p>You can see and correct your details in <a href="/account">My account</a>, download your data there, and delete your account there. You may also ask us to restrict or stop processing, or complain to the supervisory authority (in Poland: UODO, <i>uodo.gov.pl</i>).</p>
+</article>
+{% endblock %}

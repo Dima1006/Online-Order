@@ -126,7 +126,8 @@ class SecurityMiddleware:
         host = conn.headers.get("host", "")
         # Safari needs the websocket host spelled out; 'self' alone does not cover ws:// there.
         ws = f" ws://{host} wss://{host}" if _HOST_OK.match(host) else ""
-        csp = ("default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; "
+        cf = " https://challenges.cloudflare.com" if cfg.CAPTCHA_ENABLED else ""
+        csp = (f"default-src 'self'; script-src 'self'{cf}; frame-src 'self'{cf}; style-src 'self'; font-src 'self'; img-src 'self' data:; "
                f"connect-src 'self'{ws}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
 
         received = 0

@@ -31,7 +31,7 @@ def mail_to(addr, subject_part):
 with TestClient(app, base_url=B) as c:
     sql("UPDATE venues SET open_time='00:00', close_time='00:00', prep_minutes=5 WHERE id=1")
     # --- sign up: must confirm the address before ordering
-    c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "phone": "600100200"})
+    c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "600100200"})
     _, body = mail_to("ola@example.pl", "Confirm")
     link = re.search(r"https://testserver(/verify/\S+)", body).group(1)
     page = c.get("/v/wood-coffee").text

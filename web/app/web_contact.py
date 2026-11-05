@@ -1,6 +1,7 @@
 """Contact form: messages are saved for the owner (read in /admin) and mailed to ADMIN_EMAIL when e-mail works."""
 from . import config as cfg
 from .core import go, read_form, render, route
+from .legal import CAPTCHA_ERROR, captcha_ok
 from .mail import send_mail_bg
 from .security import client_ip, limiter
 from .utils import clean, valid_email
@@ -18,7 +19,9 @@ async def contact(request, conn):
         return go(request, "/contact", msg="Thank you! We will get back to you.")
     if not limiter.allow(f"contact:{client_ip(request)}", cfg.CONTACT_PER_HOUR, 3600):
         raise HTTPException(429, "Too many messages. Please try again later.")
-    if not data["name"]:
+    if not await captcha_ok(request, form):
+        error = CAPTCHA_ERROR
+    elif not data["name"]:
         error = "Enter your name."
     elif not valid_email(data["email"]):
         error = "Enter a valid email address so we can reply."

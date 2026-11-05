@@ -12,6 +12,7 @@ from starlette.websockets import WebSocket
 from . import config as cfg
 from . import events, orders, realtime
 from .core import (go, hash_async, login_session, read_form, render, require_venue, route, verify_async, ws_venue)
+from .legal import CAPTCHA_ERROR, captcha_ok
 from .mail import public_url, send_mail_bg
 from .orders import hhmm, utcnow
 from .security import client_ip, limiter, ws_origin_ok
@@ -56,6 +57,10 @@ async def venue_register(request, conn):
         error = "Enter the venue name."
     elif not valid_email(email):
         error = "Enter a valid email address."
+    elif not form.get("agree"):
+        error = "Please accept the Terms and the Privacy Policy."
+    elif not await captcha_ok(request, form):
+        error = CAPTCHA_ERROR
     elif (problem := password_problem(password, email)):
         error = problem
     elif conn.execute("SELECT 1 FROM venues WHERE email = ?", (email,)).fetchone():

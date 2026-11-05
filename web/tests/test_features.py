@@ -67,7 +67,7 @@ with TestClient(app, base_url=B) as c:
     assert 'id="opt-dialog"' in page and "Oat milk" in page and '"required": true' in page.replace('":true', '": true')
 
     # customer
-    c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "phone": "+48 600 100 200"})
+    c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "+48 600 100 200"})
     def order(lines, key):
         page = c.get("/v/wood-coffee").text
         return c.post("/v/wood-coffee/order", data={"csrf": re.search(r'name="csrf" value="([^"]+)"', page).group(1), "arrival_minutes": "15",

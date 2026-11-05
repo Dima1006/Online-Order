@@ -166,7 +166,9 @@ def render(request, name: str, status_code: int = 200, *, fragment: bool = False
     me, ven = current_user(request), current_venue(request)
     conn = request.state.__dict__.get("conn")
     ctx.update(csrf=csrf_token(request), me=me, ven=ven, is_admin=admin_ok(request),
-               google_enabled=google.enabled(), demo=cfg.DEMO_MODE, active_order=None, ven_new=0)
+               google_enabled=google.enabled(), demo=cfg.DEMO_MODE,
+               captcha_site_key=cfg.TURNSTILE_SITE_KEY if cfg.CAPTCHA_ENABLED else "",
+               company=cfg.COMPANY_NAME, company_address=cfg.COMPANY_ADDRESS, privacy_email=cfg.PRIVACY_EMAIL, active_order=None, ven_new=0)
     if conn is not None and not fragment:
         if me:  # banner: "your order is being prepared"
             ctx["active_order"] = orders.active_order_of(conn, me["id"])

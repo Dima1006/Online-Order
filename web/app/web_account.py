@@ -15,6 +15,7 @@ from . import google, orders, realtime
 from .core import (current_user, go, hash_async, login_session, read_form, render, require_user, route,
                    verify_async, ws_user)
 from .events import announce
+from .legal import CAPTCHA_ERROR, captcha_ok
 from .mail import public_url, send_mail_bg
 from .security import client_ip, limiter, ws_origin_ok
 from .utils import (clean, dummy_hash, name_problem, normalize_phone, password_problem, safe_next,
@@ -154,6 +155,10 @@ async def signup(request, conn):
         error = PHONE_HELP
     elif not valid_email(email):
         error = "Enter a valid email address."
+    elif not form.get("agree"):
+        error = "Please accept the Terms and the Privacy Policy."
+    elif not await captcha_ok(request, form):
+        error = CAPTCHA_ERROR
     elif (problem := password_problem(password, email)):
         error = problem
     elif conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():

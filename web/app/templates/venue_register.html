@@ -13,6 +13,8 @@
     <label>City <input name="city" value="{{ form.city or '' }}" maxlength="60"></label>
     <label>Email <input type="email" name="email" value="{{ form.email or '' }}" required autocomplete="email"></label>
     <label>Password <span class="muted">(10+ characters)</span> <input type="password" name="password" required minlength="10" maxlength="128" autocomplete="new-password"></label>
+    <label class="check"><input type="checkbox" name="agree" value="1" required> <span>I accept the <a href="/terms" target="_blank" rel="noopener">Terms</a> and the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+    {% if captcha_site_key %}<div class="cf-turnstile" data-sitekey="{{ captcha_site_key }}"></div><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
     <button class="btn wide">Create venue account</button>
   </form>
 </section>

@@ -47,13 +47,13 @@ with TestClient(app, base_url="https://testserver") as c:
     # --- CSRF + signup validation
     assert c.post("/login", data={"email": "a@b.pl", "password": "x"}).status_code == 403
     t = csrf(c, "/signup")
-    bad = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "short", "phone": ""})
+    bad = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "short", "agree": "1", "phone": ""})
     assert bad.status_code == 400
-    bad = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "phone": "abc"})
+    bad = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "abc"})
     assert bad.status_code == 400
-    bot = c.post("/signup", data={"csrf": t, "name": "Bot", "email": "bot@example.pl", "password": "correct-horse-1", "phone": "", "website": "http://spam"}, follow_redirects=False)
+    bot = c.post("/signup", data={"csrf": t, "name": "Bot", "email": "bot@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "", "website": "http://spam"}, follow_redirects=False)
     assert one("SELECT 1 FROM users WHERE email='bot@example.pl'") is None  # honeypot filled -> nothing created
-    r = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "phone": "+48 600 100 200"}, follow_redirects=False)
+    r = c.post("/signup", data={"csrf": t, "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "+48 600 100 200"}, follow_redirects=False)
     assert r.status_code == 303, r.text
 
     # --- order, idempotency, ownership
@@ -113,7 +113,7 @@ with TestClient(app, base_url="https://testserver") as c:
     # --- venue registration, approval, isolation
     v2 = TestClient(app, base_url="https://testserver")
     r = v2.post("/venue/register", data={"csrf": csrf(v2, "/venue/register"), "venue_name": "Café Łódź", "city": "Łódź",
-                "email": "cafe@example.pl", "password": "correct-horse-1"}, follow_redirects=False)
+                "email": "cafe@example.pl", "password": "correct-horse-1", "agree": "1"}, follow_redirects=False)
     assert r.status_code == 303
     assert "waiting for approval" in v2.get("/panel/settings").text
     assert "Café" not in c.get("/?q=cafe").text           # pending venue is not public

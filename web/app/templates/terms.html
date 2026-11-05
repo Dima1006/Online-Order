@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Terms of use · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<article class="prose">
+<h1>Terms of use</h1>
+<p class="muted small">Operator: {{ company or "the operator of this site" }}{% if company_address %}, {{ company_address }}{% endif %}.</p>
+
+<h2>What {{ APP_NAME }} is</h2>
+<p>{{ APP_NAME }} lets you order ahead from cafés and other venues and pick the order up. The sale is between you and the venue. {{ APP_NAME }} passes the order on and does not prepare, sell or deliver the goods.</p>
+
+<h2>Orders and payment</h2>
+<p>You pay at the venue when you pick up your order, unless the venue offers another method. Prices and availability are set by the venue. A venue may refuse or cancel an order, for example when an item is sold out.</p>
+
+<h2>Your account</h2>
+<p>Give true details and keep your password private. If you repeatedly do not collect orders, a venue may stop accepting orders from you. You can delete your account at any time.</p>
+
+<h2>Venues</h2>
+<p>Venues are approved before they appear. A venue is responsible for its menu, prices, allergen information, photos (you must have the right to use them) and for fulfilling accepted orders. We may suspend a venue that breaks these terms.</p>
+
+<h2>Acceptable use</h2>
+<p>No abuse, automated mass requests, fake orders, or attempts to break the service.</p>
+
+<h2>Liability</h2>
+<p>We work to keep the service available but do not guarantee it is uninterrupted. Nothing here limits rights you have as a consumer under Polish and EU law.</p>
+
+<h2>Changes</h2>
+<p>We may update these terms; the current version is always on this page.</p>
+<p>Questions: <a href="/contact">contact us</a>.</p>
+</article>
+{% endblock %}
