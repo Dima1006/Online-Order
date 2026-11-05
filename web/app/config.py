@@ -51,7 +51,7 @@ TELEGRAM_BOT_USERNAME = ""  # filled in at startup from getMe
 MAIL_LOG_BODY = env_bool("MAIL_LOG_BODY")
 MAIL_ENABLED = bool(SMTP_HOST or BREVO_API_KEY)
 # With working e-mail, customers must confirm their address before ordering (otherwise nobody could be reached).
-VERIFY_REQUIRED = MAIL_ENABLED
+VERIFY_REQUIRED = MAIL_ENABLED and not DEMO_MODE
 CODE_TTL_MIN = 10                # a sign-in code from e-mail works this long
 CODE_MAX_TRIES = 5               # wrong guesses before the code is thrown away
 CONTACT_PER_HOUR = 3             # contact-form messages per IP per hour
