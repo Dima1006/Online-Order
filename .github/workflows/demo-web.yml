@@ -46,7 +46,6 @@ jobs:
         working-directory: web
         env:
           DEMO_SEED: "1"
-          DEMO_MODE: "1"          # demo only: e-mail confirmation is not required to order
           TRUST_PROXY: "1"
           DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
