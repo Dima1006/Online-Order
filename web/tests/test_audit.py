@@ -75,5 +75,18 @@ resp = other.post(f"/panel/orders/{oid}/status", data={"csrf": t, "status": "pre
 expect(one("SELECT status FROM orders WHERE id=?", oid)[0] == "new", "venue changed another venue's order")
 expect(other.get(f"/panel/orders?q=Test").text.count(f"#{oid}") == 0, "venue lists another venue's orders")
 
+# Client IP behind Cloudflare: a forged X-Forwarded-For must not change it (rate limits would be dodged).
+from types import SimpleNamespace
+from app import config as cfg
+from app.security import client_ip
+fake = lambda h, peer="127.0.0.1": SimpleNamespace(headers=h, client=SimpleNamespace(host=peer))
+old = cfg.TRUST_PROXY
+cfg.TRUST_PROXY = True
+expect(client_ip(fake({"cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "1.2.3.4"})) == "203.0.113.7", "CF-Connecting-IP ignored")
+expect(client_ip(fake({"x-forwarded-for": "1.2.3.4"})) == "127.0.0.1", "forged X-Forwarded-For trusted")
+cfg.TRUST_PROXY = False
+expect(client_ip(fake({"cf-connecting-ip": "203.0.113.7"}, "198.51.100.1")) == "198.51.100.1", "CF header trusted without TRUST_PROXY")
+cfg.TRUST_PROXY = old
+
 for p in problems: print("PROBLEM:", p)
 print("OK" if not problems else f"{len(problems)} PROBLEMS")

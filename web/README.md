@@ -23,7 +23,7 @@ Open http://127.0.0.1:8000. Admin: `/admin`. Run one process only (no `--workers
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Outgoing mail (Gmail works with an app password). Without it mails are only logged. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Redirect URI: `BASE_URL/auth/google/callback`. |
 | `TELEGRAM_BOT_TOKEN` | Create a bot with @BotFather. Venues connect chats in Settings → Telegram. |
-| `TRUST_PROXY=1` | Behind Cloudflare or a proxy (real client IP for rate limits). |
+| `TRUST_PROXY=1` | Only behind Cloudflare: real client IP from `CF-Connecting-IP` (for rate limits). Behind another proxy use `uvicorn --proxy-headers` instead. |
 | `DEMO_MODE=1` | Demo only: no e-mail confirmation needed to order. |
 | `DATABASE_PATH` | SQLite file (default `web/data/app.db`). |
 

@@ -23,7 +23,12 @@ jobs:
 
       - name: Open a public tunnel
         run: |
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          # Pinned version + checksum: this job holds every secret, so never run an unverified binary.
+          # To update: take the version and the "cloudflared-linux-amd64:" hash from the release notes.
+          CLOUDFLARED_VERSION=2026.10.7
+          CLOUDFLARED_SHA256=1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872
+          curl -fsSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o cloudflared
+          echo "${CLOUDFLARED_SHA256}  cloudflared" | sha256sum -c -
           chmod +x cloudflared
           nohup ./cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000 > tunnel.log 2>&1 &
           URL=""
@@ -58,6 +63,8 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}   # optional CAPTCHA; off while unset
+          TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
           SECRET_KEY_FROM_SECRET: ${{ secrets.SECRET_KEY }}
         run: |
           export SECRET_KEY="${SECRET_KEY_FROM_SECRET:-$(openssl rand -hex 32)}"

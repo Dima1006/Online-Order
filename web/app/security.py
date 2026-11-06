@@ -76,10 +76,11 @@ limiter = RateLimiter()
 
 
 def client_ip(request) -> str:
+    # TRUST_PROXY = only reachable through Cloudflare: its edge overwrites CF-Connecting-IP, so the value is real.
+    # The leftmost X-Forwarded-For entry is NOT used: clients write it themselves, so it would let anyone dodge
+    # rate limits. Behind another proxy run uvicorn with --proxy-headers: it puts the real address in request.client.
     if cfg.TRUST_PROXY:
-        ip = request.headers.get("cf-connecting-ip")
-        if not ip:
-            ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        ip = request.headers.get("cf-connecting-ip", "").strip()
         if ip:
             return ip[:64]
     return request.client.host if request.client else "unknown"

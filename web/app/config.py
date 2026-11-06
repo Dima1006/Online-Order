@@ -19,7 +19,7 @@ if SECRET_KEY_GENERATED:
     SECRET_KEY = secrets.token_hex(32)  # sessions are lost on restart; set SECRET_KEY in production
     logging.getLogger("coffee").warning("SECRET_KEY is not set: a random one is used for this run.")
 
-# Behind Cloudflare / a reverse proxy: take the client IP from CF-Connecting-IP / X-Forwarded-For.
+# Only reachable through Cloudflare (tunnel or proxied DNS): take the client IP from CF-Connecting-IP.
 # Leave off when the app is reachable directly, otherwise clients could fake their IP.
 TRUST_PROXY = env_bool("TRUST_PROXY")
 
