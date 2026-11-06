@@ -81,14 +81,14 @@ def _smtp_steps(port: int) -> str:
     steps = []
     s = None
     try:
-        s = smtplib.SMTP(timeout=10)
-        code, msg = s.connect(cfg.SMTP_HOST, port); steps.append(f"connect {code}")
+        # Host goes to the constructor: smtplib only remembers it there, and starttls() needs it for the TLS hostname.
+        s = smtplib.SMTP(cfg.SMTP_HOST, port, timeout=10); steps.append("connect 220")
         code, msg = s.ehlo(); steps.append(f"ehlo {code}")
         code, msg = s.starttls(); steps.append(f"starttls {code}")
         code, msg = s.ehlo(); steps.append(f"ehlo-tls {code}")
         if cfg.SMTP_USER:
             code, msg = s.login(cfg.SMTP_USER, cfg.SMTP_PASSWORD); steps.append(f"login {code}")
-        steps.append("OK: the server accepts this login")
+        steps.append("OK: the server accepts this login" if cfg.SMTP_USER else "OK (no SMTP_USER, login not tried)")
     except smtplib.SMTPAuthenticationError as exc:
         steps.append(f"login REFUSED {exc.smtp_code} {exc.smtp_error.decode('utf-8', 'replace')[:100]}")
     except Exception as exc:
@@ -116,10 +116,12 @@ def _diagnose_sync() -> str:
     parts.append(f"our hostname={socket.getfqdn()!r}")
     parts.append("conversation: " + _smtp_steps(587))
     try:
-        with socket.create_connection((cfg.SMTP_HOST, 465), timeout=8):
-            parts.append("port 465 connects")
-    except OSError as exc:
-        parts.append(f"port 465 FAILED: {type(exc).__name__} {exc}")
+        with smtplib.SMTP_SSL(cfg.SMTP_HOST, 465, timeout=10) as s:   # TCP alone is not enough: check the TLS handshake too
+            s.ehlo()
+            parts.append("port 465 TLS ok")
+    except Exception as exc:
+        parts.append(f"port 465 FAILED: {type(exc).__name__} {str(exc)[:120]}")
+    parts.append("If TLS is cut on both ports, this network blocks SMTP: use BREVO_API_KEY + MAIL_FROM (HTTPS).")
     return " | ".join(parts)
 
 
