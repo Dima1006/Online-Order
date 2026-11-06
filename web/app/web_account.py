@@ -56,6 +56,9 @@ async def login(request, conn):
     ok = await verify_async(password, stored)
     if not (user and user["password_hash"] and ok):
         return render(request, "login.html", 400, next=nxt, email=email, error="Wrong email or password.")
+    if cfg.VERIFY_REQUIRED and not user["email_verified"]:
+        # The password is right, but the address was never confirmed: no session until the link is opened.
+        return _check_email_page(request, email, nxt, 403)
     login_session(request, user=user)
     return go(request, nxt)
 
@@ -127,11 +130,16 @@ async def login_code_verify(request, conn):
                   error="That code is wrong or has expired. Check the latest email, or request a new code.")
 
 
-def _send_verification(request, user) -> None:
-    token = _signer("verify-email").dumps({"uid": user["id"], "email": user["email"]})
+def _send_verification(request, user, nxt: str = "/") -> None:
+    token = _signer("verify-email").dumps({"uid": user["id"], "email": user["email"], "next": safe_next(nxt)})
     send_mail_bg(user["email"], "Confirm your email",
-                 f"Hi {user['name']},\n\nConfirm your email address:\n{public_url('/verify/' + token, request)}\n\n"
+                 f"Hi {user['name']},\n\nConfirm your email address to finish signing up:\n{public_url('/verify/' + token, request)}\n\n"
                  "The link is valid for 3 days. If you did not sign up, ignore this message.")
+
+
+def _check_email_page(request, email: str, nxt: str, status: int = 200, sent_again: bool = False):
+    """'Open the link we sent': shown after sign-up and when an unconfirmed account tries to log in."""
+    return render(request, "check_email.html", status, email=email, next=nxt, sent_again=sent_again)
 
 
 @route
@@ -171,11 +179,13 @@ async def signup(request, conn):
         uid = conn.execute("INSERT INTO users (email, password_hash, name, phone) VALUES (?, ?, ?, ?)",
                            (email, hashed, name, phone)).lastrowid
     user = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    _send_verification(request, user)
+    _send_verification(request, user, nxt)
+    if cfg.VERIFY_REQUIRED:
+        # Not signed in yet: the link in the e-mail confirms the address and signs the customer in.
+        request.session.clear()
+        return _check_email_page(request, email, nxt)
     login_session(request, user=user)
-    msg = ("Account created. Check your inbox and confirm your email to place orders."
-           if cfg.VERIFY_REQUIRED else "Account created.")
-    return go(request, nxt, msg=msg)
+    return go(request, nxt, msg="Account created.")
 
 
 @route
@@ -191,20 +201,37 @@ async def verify_email(request, conn):
         data = _signer("verify-email").loads(request.path_params["token"], max_age=3 * 86400)
     except (BadSignature, SignatureExpired):
         return render(request, "message.html", 400, title="Link expired",
-                      text="This confirmation link is invalid or has expired. Log in and request a new one in My account.")
+                      text="This confirmation link is invalid or has expired. Log in with your password to get a new one.")
     with conn:
-        conn.execute("UPDATE users SET email_verified = 1 WHERE id = ? AND email = ?", (data["uid"], data["email"]))
+        first = conn.execute("UPDATE users SET email_verified = 1 WHERE id = ? AND email = ? AND email_verified = 0",
+                             (data["uid"], data["email"])).rowcount == 1
+    if first:
+        # Only the first use signs in, so an old link in a mailbox is not a lasting way into the account.
+        user = conn.execute("SELECT * FROM users WHERE id = ?", (data["uid"],)).fetchone()
+        login_session(request, user=user)
+        return go(request, safe_next(data.get("next")), msg="Email confirmed. Welcome!")
     return go(request, "/account" if current_user(request) else "/login", msg="Email confirmed. Thank you!")
 
 
 @route
 async def resend_verification(request, conn):
-    await read_form(request)
-    user = require_user(request)
-    _throttle(f"resend:{user['id']}", 3, 3600)
-    if not user["email_verified"]:
-        _send_verification(request, user)
-    return go(request, "/account", msg="If your address is not confirmed yet, a new link is on its way.")
+    """New confirmation link: for the signed-in customer, or by address from the 'check your email' page."""
+    form = await read_form(request)
+    msg = "If your address is not confirmed yet, a new link is on its way."
+    user = current_user(request)
+    if user:
+        _throttle(f"resend:{user['id']}", 3, 3600)
+        if not user["email_verified"]:
+            _send_verification(request, user)
+        return go(request, "/account", msg=msg)
+    email = clean(str(form.get("email", "")), 254).lower()
+    nxt = safe_next(str(form.get("next", "")))
+    _throttle(f"resend-ip:{client_ip(request)}", 10, 3600)
+    _throttle(f"resend-email:{email}", 3, 3600)
+    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone() if valid_email(email) else None
+    if row and not row["email_verified"]:
+        _send_verification(request, row, nxt)
+    return _check_email_page(request, email, nxt, sent_again=True)   # same answer whether the address exists or not
 
 
 # ---------------------------------------------------------------- password reset

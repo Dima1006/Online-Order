@@ -30,19 +30,39 @@ def mail_to(addr, subject_part):
 
 with TestClient(app, base_url=B) as c:
     sql("UPDATE venues SET open_time='00:00', close_time='00:00', prep_minutes=5 WHERE id=1")
-    # --- sign up: must confirm the address before ordering
-    c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1", "agree": "1", "phone": "600100200"})
+    # --- sign up: the link in the e-mail confirms the address and signs in; nothing works before it
+    r = c.post("/signup", data={"csrf": csrf(c, "/signup"), "name": "Ola", "email": "ola@example.pl", "password": "correct-horse-1",
+                                "agree": "1", "phone": "600100200", "next": "/v/wood-coffee"})
+    assert r.status_code == 200 and "We sent a confirmation link to" in r.text and "ola@example.pl" in r.text
+    assert c.get("/account", follow_redirects=False).status_code in (302, 303)   # not signed in yet
     _, body = mail_to("ola@example.pl", "Confirm")
     link = re.search(r"https://testserver(/verify/\S+)", body).group(1)
+    # the right password is not enough before confirming
+    r = c.post("/login", data={"csrf": csrf(c, "/login"), "email": "ola@example.pl", "password": "correct-horse-1"}, follow_redirects=False)
+    assert r.status_code == 403 and "We sent a confirmation link to" in r.text
+    assert c.get("/account", follow_redirects=False).status_code in (302, 303)
+    # "send the link again" from that page: same answer for unknown addresses, no mail to them
+    n_before = len([s for s in SENT if s[0] == "ola@example.pl"])
+    for addr in ("ola@example.pl", "nobody@example.pl"):
+        r = c.post("/resend-verification", data={"csrf": csrf(c, "/login"), "email": addr, "next": "/"})
+        assert r.status_code == 200 and "a new link is on its way" in r.text
+    time.sleep(0.2)
+    assert len([s for s in SENT if s[0] == "ola@example.pl"]) == n_before + 1 and not [s for s in SENT if s[0] == "nobody@example.pl"]
+    # opening the link: confirmed, signed in, back where the customer started
+    r = c.get(link, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/v/wood-coffee"
+    assert one("SELECT email_verified FROM users WHERE email='ola@example.pl'")["email_verified"] == 1
+    assert c.get("/account", follow_redirects=False).status_code == 200
     page = c.get("/v/wood-coffee").text
-    assert "Confirm your email address first" in page
     vid = re.search(r'data-variant="(\d+)"', page).group(1)
     order = lambda key: c.post("/v/wood-coffee/order", data={"csrf": re.search(r'name="csrf" value="([^"]+)"', c.get("/v/wood-coffee").text).group(1),
             "arrival_minutes": "15", "note": "", "cart": f'[{{"variant_id": {vid}, "qty": 1}}]', "submit_key": key}, follow_redirects=False)
-    assert order("n1-long-key-xx").status_code != 303                       # not confirmed yet
-    assert c.get(link, follow_redirects=True).status_code == 200
-    assert one("SELECT email_verified FROM users WHERE email='ola@example.pl'")["email_verified"] == 1
     assert order("n2-long-key-xx").status_code == 303                       # confirmed: allowed
+    # the link signs in only once: an old e-mail is not a lasting key to the account
+    other = TestClient(app, base_url=B)
+    r = other.get(link, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
+    assert other.get("/account", follow_redirects=False).status_code in (302, 303)
     assert c.get("/verify/garbage").status_code in (400, 404)
 
     # --- password reset: works once, only with a real token, same answer for unknown emails

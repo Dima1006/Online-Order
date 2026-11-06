@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Confirm your email · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<section class="auth">
+  <h1>Confirm your email</h1>
+  {% if sent_again %}<div class="notice ok" role="status">If this address is waiting for confirmation, a new link is on its way.</div>{% endif %}
+  <p>We sent a confirmation link to <strong>{{ email }}</strong>.</p>
+  <p class="muted">Open it to finish signing up: it confirms your address and signs you in. The link is valid for 3 days.</p>
+  <form method="post" action="/resend-verification">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="email" value="{{ email }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn ghost wide">Send the link again</button>
+  </form>
+  <p class="muted">Nothing arrived? Check spam. Wrong address? <a href="/signup?next={{ next | urlencode }}">Sign up again</a>.</p>
+</section>
+{% endblock %}
